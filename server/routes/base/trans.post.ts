@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const llm = getLLM()
+    const llm = await getLLM()
     const prompt = ChatPromptTemplate.fromTemplate([
       '你是古文翻译专家。',
       '请将输入的古文翻译成现代汉语。',

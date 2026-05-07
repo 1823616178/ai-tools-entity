@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const llm = getLLM()
+    const llm = await getLLM()
     const parser = new JsonOutputParser()
     const prompt = ChatPromptTemplate.fromTemplate([
       '你是古文实体标引专家。',

@@ -2,17 +2,18 @@
     <div class="app-container">
         <NuxtRouteAnnouncer />
         <header class="app-header">
-            <h1>古籍智能处理平台</h1>
-            <p class="subtitle">前端与文档接口保持一致</p>
+            <div class="header-main">
+                <div>
+                    <h1>古籍智能处理平台</h1>
+                    <p class="subtitle">前端与文档接口保持一致</p>
+                </div>
+                <NuxtLink to="/admin" class="admin-link">⚙️ 配置管理</NuxtLink>
+            </div>
         </header>
 
         <nav class="tab-nav">
-            <button
-                v-for="tab in tabs"
-                :key="tab.key"
-                :class="['tab-btn', { active: activeTab === tab.key }]"
-                @click="activeTab = tab.key"
-            >
+            <button v-for="tab in tabs" :key="tab.key" :class="['tab-btn', { active: activeTab === tab.key }]"
+                @click="activeTab = tab.key">
                 <span class="tab-icon">{{ tab.icon }}</span>
                 <span class="tab-label">{{ tab.label }}</span>
             </button>
@@ -88,12 +89,9 @@
             <div v-if="nerForm.entities.length" class="result-box">
                 <h3>实体识别结果（{{ nerForm.entities.length }} 个实体）</h3>
                 <div class="entity-tags">
-                    <span
-                        v-for="(entity, idx) in nerForm.entities"
-                        :key="idx"
+                    <span v-for="(entity, idx) in nerForm.entities" :key="idx"
                         :class="['entity-tag', getEntityClass(entity.type)]"
-                        :title="`位置: ${entity.start}-${entity.end} | 类型: ${entity.type}`"
-                    >
+                        :title="`位置: ${entity.start}-${entity.end} | 类型: ${entity.type}`">
                         {{ entity.value }}
                         <small>{{ entity.type }}</small>
                     </span>
@@ -313,12 +311,12 @@ const segmentedDisplay = computed(() => {
 
         if (pos > lastPos) {
             for (let i = lastPos; i < pos && i < text.length; i++) {
-                segments.push({ char: text[i], puncs: '' })
+                segments.push({ char: text[i] ?? '', puncs: '' })
             }
         }
 
         if (segments.length && pos > 0 && mark.punc?.length) {
-            segments[segments.length - 1].puncs += mark.punc.join('')
+            segments[segments.length - 1]!.puncs += mark.punc.join('')
         } else if (pos === 0 && mark.punc?.length) {
             segments.unshift({ char: '', puncs: mark.punc.join('') })
         }
@@ -327,7 +325,7 @@ const segmentedDisplay = computed(() => {
     }
 
     for (let i = lastPos; i < text.length; i++) {
-        segments.push({ char: text[i], puncs: '' })
+        segments.push({ char: text[i] ?? '', puncs: '' })
     }
 
     return segments
@@ -546,8 +544,13 @@ body {
 }
 
 .app-header {
-    text-align: center;
     padding: 32px 0 24px;
+}
+
+.header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .app-header h1 {
@@ -560,6 +563,24 @@ body {
 .subtitle {
     font-size: 14px;
     color: #888;
+}
+
+.admin-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    background: #1a1a2e;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.admin-link:hover {
+    background: #2d2d4a;
 }
 
 .tab-nav {
@@ -959,4 +980,3 @@ details summary {
     }
 }
 </style>
-

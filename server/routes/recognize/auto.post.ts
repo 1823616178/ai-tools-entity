@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const llm = getLLM()
+    const llm = await getLLM()
     const parser = new JsonOutputParser()
     const systemPrompt = [
       '你是古籍图片识别专家。',

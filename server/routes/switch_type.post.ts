@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const llm = getLLM()
+    const llm = await getLLM()
     const parser = new JsonOutputParser()
     const prompt = ChatPromptTemplate.fromTemplate([
       '你是 OCR 结果格式转换专家。',
