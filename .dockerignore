@@ -3,6 +3,8 @@
 .output
 .git
 .gitignore
+.env
+.env.*
 logs
 README.md
 *.log
