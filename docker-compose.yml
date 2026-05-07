@@ -5,7 +5,7 @@
       dockerfile: Dockerfile
     container_name: ai-tool
     ports:
-      - "3000:3000"
+      - "54350:3000"
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
