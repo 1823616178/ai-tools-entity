@@ -1,9 +1,15 @@
-﻿services:
+services:
   ai-tool:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: ai-tool
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
     ports:
       - "54350:3000"
     volumes:

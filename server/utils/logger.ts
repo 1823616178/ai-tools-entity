@@ -1,11 +1,38 @@
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 
-const LOG_DIR = path.resolve(process.cwd(), 'logs')
+let logDir: string | null = null
+let fileLoggingDisabledReason = ''
+let fileLoggingWarningShown = false
 
-// 确保日志目录存在
-if (!fs.existsSync(LOG_DIR)) {
-  fs.mkdirSync(LOG_DIR, { recursive: true })
+function resolveWritableLogDir(): string | null {
+  const candidates = [
+    process.env.LOG_DIR,
+    path.resolve(process.cwd(), 'logs'),
+    path.join(os.tmpdir(), 'aiTool-logs'),
+  ].filter((value): value is string => Boolean(value))
+
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true })
+      fs.accessSync(dir, fs.constants.W_OK)
+      return dir
+    } catch (error: any) {
+      fileLoggingDisabledReason = `${dir}: ${error?.message || '目录不可写'}`
+    }
+  }
+
+  return null
+}
+
+function getLogDir(): string | null {
+  if (logDir !== null) {
+    return logDir
+  }
+
+  logDir = resolveWritableLogDir()
+  return logDir
 }
 
 /**
@@ -33,17 +60,30 @@ function getTimestamp(): string {
  * @param message 日志内容
  */
 function writeLog(module: string, level: string, message: string) {
+  const currentLogDir = getLogDir()
+  if (!currentLogDir) {
+    if (!fileLoggingWarningShown) {
+      fileLoggingWarningShown = true
+      console.warn(`[日志] 文件日志已禁用: ${fileLoggingDisabledReason}`)
+    }
+    return
+  }
+
   const dateStr = getDateStr()
   const timestamp = getTimestamp()
-  const logFile = path.join(LOG_DIR, `${dateStr}.log`)
+  const logFile = path.join(currentLogDir, `${dateStr}.log`)
 
   const line = `[${timestamp}] [${level}] [${module}] ${message}\n`
 
   try {
     fs.appendFileSync(logFile, line, 'utf-8')
-  } catch (err) {
-    // 写入失败时回退到控制台
-    console.error('[日志] 写入文件失败:', err)
+  } catch (error: any) {
+    logDir = null
+    fileLoggingDisabledReason = `${logFile}: ${error?.message || '写入失败'}`
+    if (!fileLoggingWarningShown) {
+      fileLoggingWarningShown = true
+      console.warn(`[日志] 文件日志已禁用: ${fileLoggingDisabledReason}`)
+    }
   }
 }
 

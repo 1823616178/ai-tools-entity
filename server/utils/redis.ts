@@ -3,6 +3,33 @@ import { logger } from './logger'
 
 let redisClient: Redis | null = null
 
+function formatRedisError(error: unknown): string {
+  if (!error) return '未知错误'
+  if (typeof error === 'string') return error
+
+  const err = error as {
+    name?: string
+    message?: string
+    code?: string
+    errno?: string | number
+    syscall?: string
+    address?: string
+    port?: string | number
+  }
+
+  const parts = [
+    err.name,
+    err.code,
+    err.message,
+    err.errno !== undefined ? `errno=${err.errno}` : '',
+    err.syscall ? `syscall=${err.syscall}` : '',
+    err.address ? `address=${err.address}` : '',
+    err.port !== undefined ? `port=${err.port}` : '',
+  ].filter(Boolean)
+
+  return parts.length ? parts.join(' | ') : JSON.stringify(error)
+}
+
 export function getRedisClient(): Redis {
   if (redisClient) {
     return redisClient
@@ -34,7 +61,7 @@ export function getRedisClient(): Redis {
   })
 
   redisClient.on('error', (err) => {
-    logger.error('Redis', `连接错误: ${err.message}`)
+    logger.error('Redis', `连接错误: ${formatRedisError(err)}`)
   })
 
   return redisClient
