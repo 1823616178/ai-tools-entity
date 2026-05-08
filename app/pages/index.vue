@@ -182,6 +182,28 @@
                 <pre class="json-output">{{ JSON.stringify(switchForm.result, null, 2) }}</pre>
             </div>
         </section>
+
+        <section v-if="activeTab === 'poetry'" class="api-section">
+            <h2>诗词创作</h2>
+            <p class="desc">请求参数和返回结构均按文档中的 `/poetry_creation` 对齐。</p>
+            <div class="form-group">
+                <label>创作要求</label>
+                <textarea
+                    v-model="poetryForm.requestText"
+                    rows="5"
+                    placeholder="请输入主题、关键词、体裁或格式要求，例如：请以春天为主题作一首七言绝句"
+                ></textarea>
+            </div>
+            <button class="btn-primary" :disabled="poetryForm.loading" @click="handlePoetryCreation">
+                <span v-if="poetryForm.loading" class="spinner"></span>
+                {{ poetryForm.loading ? '创作中...' : '开始创作' }}
+            </button>
+            <div v-if="poetryForm.error" class="error-msg">{{ poetryForm.error }}</div>
+            <div v-if="poetryForm.result" class="result-box poetry-result-box">
+                <h3>创作结果</h3>
+                <div class="poetry-result">{{ poetryForm.result }}</div>
+            </div>
+        </section>
     </div>
 </template>
 
@@ -239,6 +261,10 @@ type SwitchTypeResponse = ApiBase & {
     result: OcrResult | null
 }
 
+type PoetryCreationResponse = ApiBase & {
+    result: string
+}
+
 const activeTab = ref('translate')
 
 const tabs = [
@@ -247,10 +273,12 @@ const tabs = [
     { key: 'ner', icon: '🏷️', label: '实体标引' },
     { key: 'ocr', icon: '📷', label: '拍照识别' },
     { key: 'switchType', icon: '🔄', label: '识别切换类型' },
+    { key: 'poetry', icon: '✍️', label: '诗词创作' },
 ]
 
 const demoContent = '獻平淮夷雅表元和十二年十月癸酉淮蔡平按毛詩江漢注淮夷東國在淮浦而夷行也呉元濟在淮西故亦曰淮夷蓋公擬江漢之詩而作也與韓文公平淮西碑同時作先儒穆伯長云韓元和聖德平淮西柳雅章之類皆辭嚴義偉制述如經能崒然聳唐德於盛漢之表談藪云論柳文者皆以謂封建論退之所無淮西雅韓文不逮'
 const defaultNerType = '建筑;山水;时间;地点;动植物;著作;驿站;职官;人物;机构;器物'
+const demoPoetryPrompt = '请以春天为主题作一首七言绝句'
 
 function createJnEntryId() {
     return `实体标引(${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)})`
@@ -519,6 +547,38 @@ async function handleSwitchType() {
         switchForm.error = getErrorMessage(e, '请求异常')
     } finally {
         switchForm.loading = false
+    }
+}
+
+const poetryForm = reactive({
+    requestText: demoPoetryPrompt,
+    loading: false,
+    error: '',
+    result: '',
+})
+
+async function handlePoetryCreation() {
+    poetryForm.loading = true
+    poetryForm.error = ''
+    poetryForm.result = ''
+
+    try {
+        const res = await $fetch<PoetryCreationResponse>('/poetry_creation', {
+            method: 'POST',
+            body: {
+                request_text: poetryForm.requestText,
+            },
+        })
+
+        if (res.code === 200) {
+            poetryForm.result = typeof res.result === 'string' ? res.result : ''
+        } else {
+            poetryForm.error = res.message || '诗词创作失败'
+        }
+    } catch (e: any) {
+        poetryForm.error = getErrorMessage(e, '请求异常')
+    } finally {
+        poetryForm.loading = false
     }
 }
 </script>
@@ -964,6 +1024,26 @@ details summary {
     margin-top: 8px;
 }
 
+.poetry-result-box {
+    background: linear-gradient(135deg, #f5efe2, #efe3c7);
+    border: 1px solid #d7c49a;
+}
+
+.poetry-result {
+    font-size: 20px;
+    line-height: 2.1;
+    letter-spacing: 1px;
+    color: #4a3426;
+    white-space: pre-wrap;
+    text-align: center;
+    padding: 24px 16px;
+    background:
+        radial-gradient(circle at top, rgba(255, 255, 255, 0.65), transparent 45%),
+        linear-gradient(180deg, rgba(255, 248, 230, 0.9), rgba(244, 232, 203, 0.9));
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px rgba(126, 90, 50, 0.12);
+}
+
 @media (max-width: 600px) {
     .form-row {
         flex-direction: column;
@@ -977,6 +1057,12 @@ details summary {
     .couplet-pair {
         flex-direction: column;
         gap: 12px;
+    }
+
+    .poetry-result {
+        font-size: 18px;
+        line-height: 1.9;
+        padding: 18px 12px;
     }
 }
 </style>
