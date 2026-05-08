@@ -1,4 +1,4 @@
-﻿import { ChatPromptTemplate } from '@langchain/core/prompts'
+import { ChatPromptTemplate } from '@langchain/core/prompts'
 import { getLLM } from '../../utils/llm'
 import { logger } from '../../utils/logger'
 

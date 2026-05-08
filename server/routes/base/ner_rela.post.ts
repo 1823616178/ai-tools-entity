@@ -1,11 +1,10 @@
-﻿import { ChatPromptTemplate } from '@langchain/core/prompts'
+import { ChatPromptTemplate } from '@langchain/core/prompts'
 import { z } from 'zod'
 import { getLLM } from '../../utils/llm'
 import { logger } from '../../utils/logger'
 
 const DEFAULT_NER_TYPE = '建筑;山水;时间;地点;动植物;著作;驿站;职官;人物;机构;器物'
 
-/** Zod schema —— 由 API 层强制约束输出格式，不靠 prompt */
 const nerResultSchema = z.object({
   entity: z.array(z.object({
     start: z.number().describe('实体起始位置，从0开始'),
@@ -77,4 +76,3 @@ export default defineEventHandler(async (event) => {
     }
   }
 })
-

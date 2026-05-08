@@ -1,4 +1,4 @@
-﻿import { ChatPromptTemplate } from '@langchain/core/prompts'
+import { ChatPromptTemplate } from '@langchain/core/prompts'
 import { z } from 'zod'
 import { getLLM } from '../utils/llm'
 import { logger } from '../utils/logger'
@@ -81,4 +81,3 @@ export default defineEventHandler(async (event) => {
     }
   }
 })
-

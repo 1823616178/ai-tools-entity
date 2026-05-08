@@ -1,4 +1,4 @@
-﻿import { z } from 'zod'
+import { z } from 'zod'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { getLLM } from '../../utils/llm'
 import { logger } from '../../utils/logger'
@@ -82,4 +82,3 @@ export default defineEventHandler(async (event) => {
     }
   }
 })
-
