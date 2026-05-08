@@ -9,11 +9,12 @@ export function getDataSource(): DataSource {
     return dataSource
   }
 
-  const host = process.env.DB_HOST || 'localhost'
-  const port = parseInt(process.env.DB_PORT || '3306', 10)
-  const username = process.env.DB_USERNAME || 'root'
-  const password = process.env.DB_PASSWORD || ''
-  const database = process.env.DB_DATABASE || 'aitool'
+  const config = useRuntimeConfig()
+  const host = config.db.host || 'localhost'
+  const port = Number(config.db.port) || 3306
+  const username = config.db.username || 'root'
+  const password = config.db.password || ''
+  const database = config.db.database || 'aitool'
 
   logger.section('DB', '初始化数据库连接')
   logger.info('DB', `Host: ${host}:${port}, Database: ${database}`)

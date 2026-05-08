@@ -67,9 +67,10 @@ async function getLLM(): Promise<ChatOpenAI> {
   // 优先从数据库获取配置
   const dbConfig = await getActiveLlmConfig()
 
-  const baseURL = dbConfig?.baseURL || process.env.LLM_BASE_URL || 'https://api.openai.com/v1'
-  const apiKey = dbConfig?.apiKey || process.env.LLM_API_KEY || ''
-  const model = dbConfig?.model || process.env.LLM_MODEL || 'gpt-4o'
+  const config = useRuntimeConfig()
+  const baseURL = dbConfig?.baseURL || config.llm.baseUrl || 'https://api.openai.com/v1'
+  const apiKey = dbConfig?.apiKey || config.llm.apiKey || ''
+  const model = dbConfig?.model || config.llm.model || 'gpt-4o'
   const temperature = dbConfig?.temperature ?? 0.1
 
   if (!configLogged) {

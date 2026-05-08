@@ -8,10 +8,11 @@ export function getRedisClient(): Redis {
     return redisClient
   }
 
-  const host = process.env.REDIS_HOST || 'localhost'
-  const port = parseInt(process.env.REDIS_PORT || '6379', 10)
-  const password = process.env.REDIS_PASSWORD || undefined
-  const db = parseInt(process.env.REDIS_DB || '0', 10)
+  const config = useRuntimeConfig()
+  const host = config.redis.host || 'localhost'
+  const port = Number(config.redis.port) || 6379
+  const password = config.redis.password || undefined
+  const db = Number(config.redis.db) || 0
 
   logger.section('Redis', '初始化Redis连接')
   logger.info('Redis', `Host: ${host}:${port}, DB: ${db}`)

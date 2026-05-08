@@ -1,7 +1,20 @@
-﻿import { JsonOutputParser } from '@langchain/core/output_parsers'
+﻿import { z } from 'zod'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { getLLM } from '../../utils/llm'
 import { logger } from '../../utils/logger'
+
+const ocrResultSchema = z.object({
+  display: z.object({
+    ocr_result: z.string().describe('识别出的文本内容'),
+    image_type: z.enum(['single_char', 'couplet', 'poem', 'ancient_book']).describe('图片类型'),
+    data: z.object({}).passthrough().describe('类型相关数据：couplet 含 first_line/second_line/top_scroll/signature，poem 含 title/author/content/signature，其他为 {}'),
+  }),
+  recognition_context: z.object({
+    vl_ocr_result: z.string().describe('视觉模型 OCR 结果'),
+    guji_ocr_result: z.string().describe('古籍 OCR 结果'),
+    danzi_ocr_result: z.string().describe('单字 OCR 结果'),
+  }),
+})
 
 export default defineEventHandler(async (event) => {
   const MODULE = 'recognize/auto'
@@ -21,23 +34,17 @@ export default defineEventHandler(async (event) => {
     }
 
     const llm = await getLLM()
-    const parser = new JsonOutputParser()
+
     const systemPrompt = [
       '你是古籍图片识别专家。',
       '请根据图片内容识别为 single_char、couplet、poem、ancient_book 之一。',
-      '返回规则：',
-      '1. 只输出 JSON。',
-      '2. 顶层格式必须是 {"display": {...}, "recognition_context": {...}}。',
-      '3. display 中必须包含 ocr_result、image_type、data。',
-      '4. recognition_context 中必须包含 vl_ocr_result、guji_ocr_result、danzi_ocr_result。',
-      '5. single_char 的 data 为 {}。',
-      '6. couplet 的 data 包含 first_line、second_line、top_scroll、signature。',
-      '7. poem 的 data 包含 title、author、content、signature。',
-      '8. ancient_book 的 data 为 {}。',
-      '9. 不要输出解释。',
+      'couplet 需提取 first_line、second_line、top_scroll、signature。',
+      'poem 需提取 title、author、content、signature。',
+      '同时返回 recognition_context 供后续切换类型使用。',
     ].join('\n')
 
-    const response = await llm.invoke([
+    const structuredLlm = llm.withStructuredOutput(ocrResultSchema)
+    const parsed = await structuredLlm.invoke([
       new SystemMessage(systemPrompt),
       new HumanMessage({
         content: [
@@ -49,7 +56,6 @@ export default defineEventHandler(async (event) => {
       }),
     ])
 
-    const parsed = await parser.parse(typeof response.content === 'string' ? response.content : String(response.content || '{}'))
     const result = {
       display: parsed?.display || { ocr_result: '', image_type: '', data: {} },
       recognition_context: {
@@ -76,3 +82,4 @@ export default defineEventHandler(async (event) => {
     }
   }
 })
+

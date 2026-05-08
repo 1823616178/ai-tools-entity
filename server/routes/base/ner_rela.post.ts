@@ -1,9 +1,23 @@
 ﻿import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { JsonOutputParser } from '@langchain/core/output_parsers'
+import { z } from 'zod'
 import { getLLM } from '../../utils/llm'
 import { logger } from '../../utils/logger'
 
 const DEFAULT_NER_TYPE = '建筑;山水;时间;地点;动植物;著作;驿站;职官;人物;机构;器物'
+
+/** Zod schema —— 由 API 层强制约束输出格式，不靠 prompt */
+const nerResultSchema = z.object({
+  entity: z.array(z.object({
+    start: z.number().describe('实体起始位置，从0开始'),
+    end: z.number().describe('实体结束位置，开区间'),
+    typeId: z.number().describe('类型编号，从45开始递增'),
+    del: z.boolean().describe('固定为 false'),
+    type: z.string().describe('中文实体类型名称，如：地点、人物、时间'),
+    typeEn: z.string().describe('英文实体类型名称，如：location、person、time'),
+    value: z.string().describe('实体原文文本'),
+  })),
+  relation: z.array(z.object({}).passthrough()),
+})
 
 export default defineEventHandler(async (event) => {
   const MODULE = 'base/ner_rela'
@@ -23,29 +37,18 @@ export default defineEventHandler(async (event) => {
     }
 
     const llm = await getLLM()
-    const parser = new JsonOutputParser()
+
     const prompt = ChatPromptTemplate.fromTemplate([
       '你是古文实体标引专家。',
-      '请从原文中抽取指定类型的实体，并返回 JSON。',
+      '请从原文中抽取指定类型的实体。',
       '可用实体类型：{nerTypes}',
-      '输出规则：',
-      '1. 只输出 JSON 对象。',
-      '2. 格式必须是 {{"entity": [...], "relation": []}}。',
-      '3. entity 中每项包含 start、end、typeId、del、type、typeEn、value。',
-      '4. start 从 0 开始，end 为开区间。',
-      '5. del 固定为 false。',
-      '6. typeId 从 45 开始递增分配。',
-      '7. relation 固定返回空数组，除非你非常确定存在且文档允许；本任务默认返回空数组。',
-      '8. 不要输出解释。',
       '',
       '条目ID：{jnEntryId}',
       '原文：',
       '{content}',
-      '',
-      'JSON：',
     ].join('\n'))
 
-    const chain = prompt.pipe(llm).pipe(parser)
+    const chain = prompt.pipe(llm.withStructuredOutput(nerResultSchema))
     const parsed = await chain.invoke({
       jnEntryId: typeof jnEntryId === 'string' ? jnEntryId : '',
       nerTypes: typeof ner_type === 'string' && ner_type.trim() ? ner_type : DEFAULT_NER_TYPE,
@@ -74,3 +77,4 @@ export default defineEventHandler(async (event) => {
     }
   }
 })
+
