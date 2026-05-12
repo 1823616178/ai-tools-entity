@@ -204,6 +204,34 @@
                 <div class="poetry-result">{{ poetryForm.result }}</div>
             </div>
         </section>
+
+        <section v-if="activeTab === 'presetQuestions'" class="api-section">
+            <h2>问题预设</h2>
+            <p class="desc">请求参数和返回结构均按文档中的 `/preset_questions` 对齐。</p>
+            <div class="form-group">
+                <label>用户 ID</label>
+                <input v-model="presetForm.userId" type="text" placeholder="user_123456" />
+            </div>
+            <div class="form-group">
+                <label>近30天问题历史（每行一个问题）</label>
+                <textarea v-model="presetForm.recentQuestionsText" rows="8" placeholder="手机拍照哪个好？&#10;如何快速减肥？&#10;Python入门教程推荐"></textarea>
+            </div>
+            <div class="form-group">
+                <label>最大返回数量（5-10）</label>
+                <input v-model.number="presetForm.maxPresetCount" type="number" min="5" max="10" />
+            </div>
+            <button class="btn-primary" :disabled="presetForm.loading" @click="handlePresetQuestions">
+                <span v-if="presetForm.loading" class="spinner"></span>
+                {{ presetForm.loading ? '生成中...' : '生成预设问题' }}
+            </button>
+            <div v-if="presetForm.error" class="error-msg">{{ presetForm.error }}</div>
+            <div v-if="presetForm.presetQuestions.length" class="result-box">
+                <h3>预设问题结果（{{ presetForm.presetQuestions.length }} 条）</h3>
+                <ol class="preset-list">
+                    <li v-for="(question, idx) in presetForm.presetQuestions" :key="idx">{{ question }}</li>
+                </ol>
+            </div>
+        </section>
     </div>
 </template>
 
@@ -265,6 +293,10 @@ type PoetryCreationResponse = ApiBase & {
     result: string
 }
 
+type PresetQuestionsResponse = ApiBase & {
+    preset_questions: string[]
+}
+
 const activeTab = ref('translate')
 
 const tabs = [
@@ -274,11 +306,13 @@ const tabs = [
     { key: 'ocr', icon: '📷', label: '拍照识别' },
     { key: 'switchType', icon: '🔄', label: '识别切换类型' },
     { key: 'poetry', icon: '✍️', label: '诗词创作' },
+    { key: 'presetQuestions', icon: '💡', label: '问题预设' },
 ]
 
 const demoContent = '獻平淮夷雅表元和十二年十月癸酉淮蔡平按毛詩江漢注淮夷東國在淮浦而夷行也呉元濟在淮西故亦曰淮夷蓋公擬江漢之詩而作也與韓文公平淮西碑同時作先儒穆伯長云韓元和聖德平淮西柳雅章之類皆辭嚴義偉制述如經能崒然聳唐德於盛漢之表談藪云論柳文者皆以謂封建論退之所無淮西雅韓文不逮'
 const defaultNerType = '建筑;山水;时间;地点;动植物;著作;驿站;职官;人物;机构;器物'
 const demoPoetryPrompt = '请以春天为主题作一首七言绝句'
+const demoPresetQuestions = ['手机拍照哪个好？', '如何快速减肥？', 'Python入门教程推荐', '旅游景点推荐', '如何提高英语口语？', '笔记本电脑选购指南']
 
 function createJnEntryId() {
     return `实体标引(${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)})`
@@ -579,6 +613,47 @@ async function handlePoetryCreation() {
         poetryForm.error = getErrorMessage(e, '请求异常')
     } finally {
         poetryForm.loading = false
+    }
+}
+
+const presetForm = reactive({
+    userId: 'user_123456',
+    recentQuestionsText: demoPresetQuestions.join('\n'),
+    maxPresetCount: 8,
+    loading: false,
+    error: '',
+    presetQuestions: [] as string[],
+})
+
+async function handlePresetQuestions() {
+    presetForm.loading = true
+    presetForm.error = ''
+    presetForm.presetQuestions = []
+
+    const recentQuestions = presetForm.recentQuestionsText
+        .split('\n')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+
+    try {
+        const res = await $fetch<PresetQuestionsResponse>('/preset_questions', {
+            method: 'POST',
+            body: {
+                user_id: presetForm.userId,
+                recent_questions: recentQuestions,
+                max_preset_count: presetForm.maxPresetCount,
+            },
+        })
+
+        if (res.code === 200) {
+            presetForm.presetQuestions = Array.isArray(res.preset_questions) ? res.preset_questions : []
+        } else {
+            presetForm.error = res.message || '问题预设失败'
+        }
+    } catch (e: any) {
+        presetForm.error = getErrorMessage(e, '请求异常')
+    } finally {
+        presetForm.loading = false
     }
 }
 </script>
@@ -1042,6 +1117,16 @@ details summary {
         linear-gradient(180deg, rgba(255, 248, 230, 0.9), rgba(244, 232, 203, 0.9));
     border-radius: 6px;
     box-shadow: inset 0 0 0 1px rgba(126, 90, 50, 0.12);
+}
+
+.preset-list {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.preset-list li {
+    margin-bottom: 8px;
+    line-height: 1.7;
 }
 
 @media (max-width: 600px) {
