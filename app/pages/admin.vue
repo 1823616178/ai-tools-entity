@@ -114,7 +114,16 @@
                 </div>
                 <div class="form-group">
                     <label>温度参数 (0-2)</label>
-                    <input v-model.number="form.temperature" type="number" step="0.1" min="0" max="2" />
+                    <div class="number-input-wrapper">
+                        <div class="slider-container">
+                            <input v-model.number="form.temperature" type="range" min="0" max="2" step="0.1"
+                                class="number-slider" />
+                            <div class="slider-value">{{ form.temperature.toFixed(1) }}</div>
+                        </div>
+                        <input v-model.number="form.temperature" type="number" step="0.1" min="0" max="2"
+                            class="number-input" />
+                    </div>
+                    <div class="input-hint">较低温度使输出更确定，较高温度使输出更随机，默认0.1</div>
                 </div>
                 <div class="form-row">
                     <div class="form-group checkbox-group">
@@ -613,6 +622,94 @@ onMounted(() => {
     outline: none;
     border-color: #1a1a2e;
     background: #fff;
+}
+
+.number-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.slider-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.number-slider {
+    flex: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #e0e0e0;
+    border-radius: 4px;
+    outline: none;
+    transition: background 0.2s;
+}
+
+.number-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.number-slider::-webkit-slider-thumb:hover {
+    background: #2d2d4a;
+}
+
+.number-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    background: #1a1a2e;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.number-slider::-moz-range-thumb:hover {
+    background: #2d2d4a;
+}
+
+.slider-value {
+    min-width: 36px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+    background: #f0f2f5;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.number-input {
+    width: 60px;
+    padding: 8px 12px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    text-align: center;
+    background: #fafafa;
+    transition: border-color 0.2s;
+}
+
+.number-input:focus {
+    outline: none;
+    border-color: #1a1a2e;
+    background: #fff;
+}
+
+.input-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #888;
 }
 
 .required {

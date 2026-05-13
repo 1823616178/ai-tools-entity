@@ -188,11 +188,8 @@
             <p class="desc">请求参数和返回结构均按文档中的 `/poetry_creation` 对齐。</p>
             <div class="form-group">
                 <label>创作要求</label>
-                <textarea
-                    v-model="poetryForm.requestText"
-                    rows="5"
-                    placeholder="请输入主题、关键词、体裁或格式要求，例如：请以春天为主题作一首七言绝句"
-                ></textarea>
+                <textarea v-model="poetryForm.requestText" rows="5"
+                    placeholder="请输入主题、关键词、体裁或格式要求，例如：请以春天为主题作一首七言绝句"></textarea>
             </div>
             <button class="btn-primary" :disabled="poetryForm.loading" @click="handlePoetryCreation">
                 <span v-if="poetryForm.loading" class="spinner"></span>
@@ -214,11 +211,21 @@
             </div>
             <div class="form-group">
                 <label>近30天问题历史（每行一个问题）</label>
-                <textarea v-model="presetForm.recentQuestionsText" rows="8" placeholder="手机拍照哪个好？&#10;如何快速减肥？&#10;Python入门教程推荐"></textarea>
+                <textarea v-model="presetForm.recentQuestionsText" rows="8"
+                    placeholder="手机拍照哪个好？&#10;如何快速减肥？&#10;Python入门教程推荐"></textarea>
             </div>
             <div class="form-group">
                 <label>最大返回数量（5-10）</label>
-                <input v-model.number="presetForm.maxPresetCount" type="number" min="5" max="10" />
+                <div class="number-input-wrapper">
+                    <div class="slider-container">
+                        <input v-model.number="presetForm.maxPresetCount" type="range" min="5" max="10" step="1"
+                            class="number-slider" />
+                        <div class="slider-value">{{ presetForm.maxPresetCount }}</div>
+                    </div>
+                    <input v-model.number="presetForm.maxPresetCount" type="number" min="5" max="10"
+                        class="number-input" />
+                </div>
+                <div class="input-hint">推荐5-10个问题，默认8个</div>
             </div>
             <button class="btn-primary" :disabled="presetForm.loading" @click="handlePresetQuestions">
                 <span v-if="presetForm.loading" class="spinner"></span>
@@ -819,6 +826,94 @@ select:focus {
 
 .flex-1 {
     flex: 1;
+}
+
+.number-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.slider-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.number-slider {
+    flex: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #e0e0e0;
+    border-radius: 4px;
+    outline: none;
+    transition: background 0.2s;
+}
+
+.number-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.number-slider::-webkit-slider-thumb:hover {
+    background: #2d2d4a;
+}
+
+.number-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    background: #1a1a2e;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.number-slider::-moz-range-thumb:hover {
+    background: #2d2d4a;
+}
+
+.slider-value {
+    min-width: 28px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+    background: #f0f2f5;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.number-input {
+    width: 60px;
+    padding: 8px 12px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    text-align: center;
+    background: #fafafa;
+    transition: border-color 0.2s;
+}
+
+.number-input:focus {
+    outline: none;
+    border-color: #1a1a2e;
+    background: #fff;
+}
+
+.input-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #888;
 }
 
 .btn-primary {
