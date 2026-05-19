@@ -25,7 +25,8 @@ function formatConversationHistory(
   return history
     .map((item) => {
       const role = item.role === 'user' ? '用户' : '助手'
-      return `${role}：${item.content}`
+      const time = item.timestamp ? ` [${item.timestamp}]` : ''
+      return `${role}${time}：${item.content}`
     })
     .join('\n')
 }
@@ -56,7 +57,8 @@ export default defineEventHandler(async (event) => {
             item !== null &&
             typeof item.role === 'string' &&
             (item.role === 'user' || item.role === 'assistant') &&
-            typeof item.content === 'string',
+            typeof item.content === 'string' &&
+            (item.timestamp === undefined || typeof item.timestamp === 'string'),
         ))
     ) {
       return {

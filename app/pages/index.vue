@@ -365,7 +365,7 @@ const demoPoetryPrompt = '请以春天为主题作一首七言绝句'
 const demoPresetQuestions = ['手机拍照哪个好？', '如何快速减肥？', 'Python入门教程推荐', '旅游景点推荐', '如何提高英语口语？', '笔记本电脑选购指南']
 const demoFollowUpQuery = '推荐一款手机'
 const demoFollowUpHistory = [
-    { role: 'user', content: '我想要拍照好的手机' },
+    { role: 'user', content: '我想要拍照好的手机', timestamp: '2024-01-01T10:00:00Z' },
 ]
 
 function createJnEntryId() {
@@ -731,11 +731,12 @@ function parseConversationHistory(text: string) {
                 return {
                     role: match[1] === '用户' || match[1] === 'user' ? 'user' : 'assistant',
                     content: match[2],
+                    timestamp: new Date().toISOString(),
                 }
             }
             return null
         })
-        .filter((item): item is { role: string; content: string } => item !== null)
+        .filter((item): item is { role: string; content: string; timestamp: string } => item !== null)
 }
 
 async function handleFollowUpQuestions() {
