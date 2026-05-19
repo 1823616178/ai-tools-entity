@@ -239,6 +239,44 @@
                 </ol>
             </div>
         </section>
+
+        <section v-if="activeTab === 'followUpQuestions'" class="api-section">
+            <h2>问题追问</h2>
+            <p class="desc">请求参数和返回结构均按文档中的 `/follow_up_questions` 对齐。</p>
+            <div class="form-group">
+                <label>当前问题</label>
+                <textarea v-model="followUpForm.query" rows="3" placeholder="请输入当前用户问题，例如：推荐一款手机"></textarea>
+            </div>
+            <div class="form-group">
+                <label>历史对话记录（每行一条，格式：用户：xxx 或 助手：xxx）</label>
+                <textarea v-model="followUpForm.historyText" rows="5"
+                    placeholder="用户：我想要拍照好的手机&#10;助手：拍照好的手机推荐..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>最大追问数量（1-5）</label>
+                <div class="number-input-wrapper">
+                    <div class="slider-container">
+                        <input v-model.number="followUpForm.maxQuestions" type="range" min="1" max="5" step="1"
+                            class="number-slider" />
+                        <div class="slider-value">{{ followUpForm.maxQuestions }}</div>
+                    </div>
+                    <input v-model.number="followUpForm.maxQuestions" type="number" min="1" max="5"
+                        class="number-input" />
+                </div>
+                <div class="input-hint">推荐1-5个追问问题，默认3个</div>
+            </div>
+            <button class="btn-primary" :disabled="followUpForm.loading" @click="handleFollowUpQuestions">
+                <span v-if="followUpForm.loading" class="spinner"></span>
+                {{ followUpForm.loading ? '生成中...' : '生成追问问题' }}
+            </button>
+            <div v-if="followUpForm.error" class="error-msg">{{ followUpForm.error }}</div>
+            <div v-if="followUpForm.followUpQuestions.length" class="result-box">
+                <h3>追问问题结果（{{ followUpForm.followUpQuestions.length }} 条）</h3>
+                <ol class="preset-list">
+                    <li v-for="(question, idx) in followUpForm.followUpQuestions" :key="idx">{{ question }}</li>
+                </ol>
+            </div>
+        </section>
     </div>
 </template>
 
@@ -304,6 +342,10 @@ type PresetQuestionsResponse = ApiBase & {
     preset_questions: string[]
 }
 
+type FollowUpQuestionsResponse = ApiBase & {
+    follow_up_questions: string[]
+}
+
 const activeTab = ref('translate')
 
 const tabs = [
@@ -314,12 +356,17 @@ const tabs = [
     { key: 'switchType', icon: '🔄', label: '识别切换类型' },
     { key: 'poetry', icon: '✍️', label: '诗词创作' },
     { key: 'presetQuestions', icon: '💡', label: '问题预设' },
+    { key: 'followUpQuestions', icon: '❓', label: '问题追问' },
 ]
 
 const demoContent = '獻平淮夷雅表元和十二年十月癸酉淮蔡平按毛詩江漢注淮夷東國在淮浦而夷行也呉元濟在淮西故亦曰淮夷蓋公擬江漢之詩而作也與韓文公平淮西碑同時作先儒穆伯長云韓元和聖德平淮西柳雅章之類皆辭嚴義偉制述如經能崒然聳唐德於盛漢之表談藪云論柳文者皆以謂封建論退之所無淮西雅韓文不逮'
 const defaultNerType = '建筑;山水;时间;地点;动植物;著作;驿站;职官;人物;机构;器物'
 const demoPoetryPrompt = '请以春天为主题作一首七言绝句'
 const demoPresetQuestions = ['手机拍照哪个好？', '如何快速减肥？', 'Python入门教程推荐', '旅游景点推荐', '如何提高英语口语？', '笔记本电脑选购指南']
+const demoFollowUpQuery = '推荐一款手机'
+const demoFollowUpHistory = [
+    { role: 'user', content: '我想要拍照好的手机' },
+]
 
 function createJnEntryId() {
     return `实体标引(${new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14)})`
@@ -661,6 +708,62 @@ async function handlePresetQuestions() {
         presetForm.error = getErrorMessage(e, '请求异常')
     } finally {
         presetForm.loading = false
+    }
+}
+
+const followUpForm = reactive({
+    query: demoFollowUpQuery,
+    historyText: demoFollowUpHistory.map((item) => `${item.role === 'user' ? '用户' : '助手'}：${item.content}`).join('\n'),
+    maxQuestions: 3,
+    loading: false,
+    error: '',
+    followUpQuestions: [] as string[],
+})
+
+function parseConversationHistory(text: string) {
+    return text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+            const match = line.match(/^(用户|助手|user|assistant)[：:]\s*(.+)$/)
+            if (match) {
+                return {
+                    role: match[1] === '用户' || match[1] === 'user' ? 'user' : 'assistant',
+                    content: match[2],
+                }
+            }
+            return null
+        })
+        .filter((item): item is { role: string; content: string } => item !== null)
+}
+
+async function handleFollowUpQuestions() {
+    followUpForm.loading = true
+    followUpForm.error = ''
+    followUpForm.followUpQuestions = []
+
+    const conversation_history = parseConversationHistory(followUpForm.historyText)
+
+    try {
+        const res = await $fetch<FollowUpQuestionsResponse>('/follow_up_questions', {
+            method: 'POST',
+            body: {
+                query: followUpForm.query,
+                conversation_history,
+                max_questions: followUpForm.maxQuestions,
+            },
+        })
+
+        if (res.code === 200) {
+            followUpForm.followUpQuestions = Array.isArray(res.follow_up_questions) ? res.follow_up_questions : []
+        } else {
+            followUpForm.error = res.message || '追问生成失败'
+        }
+    } catch (e: any) {
+        followUpForm.error = getErrorMessage(e, '请求异常')
+    } finally {
+        followUpForm.loading = false
     }
 }
 </script>

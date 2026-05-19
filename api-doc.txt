@@ -419,4 +419,37 @@ Content-Type：application/json
 400：请求参数无效（如 user_id 为空，recent_questions 格式错误等）
 500：模型处理失败或服务内部错误
 
+问题追问接口：
+地址：http://ip:port/follow_up_questions
+请求方式：POST
+Content-Type：application/json
+接口描述：用于智能问答场景下的主动追问服务，根据AI助手当前回答的问题内容，自动生成进一步追问的问题预设，提供给用户选择，以便用户能够快速、深入地了解相关话题，引导对话向更有价值的方向发展。
 
+请求参数：
+{
+  "query": "推荐一款手机",
+  "conversation_history": [
+    {
+      "role": "user",
+      "content": "我想要拍照好的手机",
+      "timestamp": "2024-01-01T10:00:00Z"
+    }
+  ],
+  "max_questions": 3
+}
+
+响应参数：
+{
+  "code": 200,
+  "message": "success",
+  "follow_up_questions": [
+    "请问您的预算是多少？",
+    "您更注重拍照的哪个方面（如夜景、人像、长焦）？",
+    "对手机的品牌有偏好吗？"
+  ]
+}
+
+状态码说明：
+200：追问问题生成成功
+400：请求参数无效（如 query 为空或 max_questions 超出范围）
+500：模型处理失败或服务内部错误
