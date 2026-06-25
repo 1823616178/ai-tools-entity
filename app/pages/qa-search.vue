@@ -228,7 +228,7 @@ type HistoryItem = { role: string; content: string }
 type QueryResultItem = { bookId: number | string; fourFold: string; title: string; author: string; score: number }
 type CiteValue = Record<string, any>
 
-const tabs = [
+const tabs: Array<{ key: 'standard' | 'summary'; icon: string; label: string }> = [
     { key: 'standard', icon: '🔍', label: '标准问答检索' },
     { key: 'summary', icon: '📚', label: '摘要问答检索' },
 ]
