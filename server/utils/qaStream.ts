@@ -15,8 +15,8 @@ import { logger } from './logger'
  * 摘要接口会在 [START] 之前额外补发一条 query_result 事件。
  */
 
-// 推理与正文之间的分隔符，提示大模型严格输出
-const ANSWER_SEPARATOR = '===ANSWER==='
+// 匹配分隔符：允许前后有空白/换行，兼容模型输出不精确的情况
+const SEPARATOR_RE = /\s*={2,}\s*ANSWER\s*={2,}\s*/
 
 export interface QaStreamOptions {
   sessionId: string
@@ -66,7 +66,8 @@ export function createQaSseStream(opts: QaStreamOptions): ReadableStream<Uint8Ar
 
         let phase: 'reason' | 'answer' = 'reason'
         let buffer = ''
-        const keep = ANSWER_SEPARATOR.length - 1
+        // 保留足够长的尾部以防分隔符被切割到两个 chunk
+        const keep = 20
 
         for await (const chunk of stream) {
           const piece = typeof chunk.content === 'string' ? chunk.content : String(chunk.content ?? '')
@@ -74,15 +75,13 @@ export function createQaSseStream(opts: QaStreamOptions): ReadableStream<Uint8Ar
           buffer += piece
 
           if (phase === 'reason') {
-            const sepIdx = buffer.indexOf(ANSWER_SEPARATOR)
-            if (sepIdx >= 0) {
-              const reasonPart = buffer.slice(0, sepIdx)
+            const match = SEPARATOR_RE.exec(buffer)
+            if (match) {
+              const reasonPart = buffer.slice(0, match.index).trim()
               if (reasonPart) send(sseData({ session_id: sessionId, type: 'reason', value: reasonPart }))
               phase = 'answer'
-              // 分隔符之后的内容，去掉紧跟的换行
-              buffer = buffer.slice(sepIdx + ANSWER_SEPARATOR.length).replace(/^\r?\n/, '')
+              buffer = buffer.slice(match.index + match[0].length).replace(/^\r?\n/, '')
             } else {
-              // 防止分隔符被切割到两个 chunk，保留尾部 keep 个字符
               const safeLen = buffer.length - keep
               if (safeLen > 0) {
                 send(sseData({ session_id: sessionId, type: 'reason', value: buffer.slice(0, safeLen) }))
@@ -92,7 +91,6 @@ export function createQaSseStream(opts: QaStreamOptions): ReadableStream<Uint8Ar
             }
           }
 
-          // answer 阶段：直接透传
           if (phase === 'answer' && buffer) {
             send(sseData({ session_id: sessionId, type: 'answer', value: buffer }))
             buffer = ''
@@ -100,8 +98,13 @@ export function createQaSseStream(opts: QaStreamOptions): ReadableStream<Uint8Ar
         }
 
         // 4. flush 剩余 buffer
+        // 如果模型从未输出分隔符，把全部内容当作 answer（而非 reason）
         if (buffer) {
-          send(sseData({ session_id: sessionId, type: phase, value: buffer }))
+          if (phase === 'reason') {
+            send(sseData({ session_id: sessionId, type: 'answer', value: buffer }))
+          } else {
+            send(sseData({ session_id: sessionId, type: 'answer', value: buffer }))
+          }
         }
 
         // 5. 引用事件（cite）

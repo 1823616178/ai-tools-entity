@@ -197,7 +197,7 @@
             </div>
 
             <!-- answer -->
-            <div v-if="stream.answer || stream.started" class="result-block">
+            <div v-if="stream.answer" class="result-block">
                 <h3>回答（answer）</h3>
                 <div class="answer-text">{{ stream.answer }}<span v-if="stream.loading" class="caret">▋</span></div>
             </div>
