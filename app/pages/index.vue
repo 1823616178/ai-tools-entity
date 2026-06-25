@@ -7,7 +7,11 @@
                     <h1>古籍智能处理平台</h1>
                     <p class="subtitle">前端与文档接口保持一致</p>
                 </div>
-                <NuxtLink to="/admin" class="admin-link">⚙️ 配置管理</NuxtLink>
+                <div class="header-links">
+                    <NuxtLink to="/qa-search" class="header-link">🔍 问答检索</NuxtLink>
+                    <NuxtLink to="/ner-external" class="header-link">🔌 外部NER</NuxtLink>
+                    <NuxtLink to="/admin" class="admin-link">⚙️ 配置管理</NuxtLink>
+                </div>
             </div>
         </header>
 
@@ -809,6 +813,32 @@ body {
 .subtitle {
     font-size: 14px;
     color: #888;
+}
+
+.header-links {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    background: #fff;
+    color: #1a1a2e;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1.5px solid #1a1a2e;
+    transition: all 0.2s;
+}
+
+.header-link:hover {
+    background: #1a1a2e;
+    color: #fff;
 }
 
 .admin-link {
