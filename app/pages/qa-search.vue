@@ -211,7 +211,7 @@
                         <small v-if="c.book.creator">{{ c.book.creator }}</small>
                         <small v-if="c.book.orgName">· {{ c.book.orgName }}</small>
                     </div>
-                    <div v-if="c.text" class="cite-text">{{ c.text }}</div>
+                    <div v-if="c.text || c.image?.text" class="cite-text">{{ c.text || c.image?.text }}</div>
                 </div>
             </div>
 

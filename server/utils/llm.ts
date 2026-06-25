@@ -9,6 +9,14 @@ let configLogged = false
 const DEFAULT_CACHE_KEY = 'llm:configs:default'
 const DEFAULT_CACHE_TTL = 300
 
+export interface ResolvedLlmConfig {
+  baseURL: string
+  apiKey: string
+  model: string
+  temperature: number
+  source: '数据库' | '环境变量'
+}
+
 async function getActiveLlmConfig(): Promise<{
   baseURL: string
   apiKey: string
@@ -63,7 +71,7 @@ async function getActiveLlmConfig(): Promise<{
   }
 }
 
-async function getLLM(): Promise<ChatOpenAI> {
+async function getResolvedLlmConfig(): Promise<ResolvedLlmConfig> {
   // 优先从数据库获取配置
   const dbConfig = await getActiveLlmConfig()
 
@@ -72,9 +80,15 @@ async function getLLM(): Promise<ChatOpenAI> {
   const apiKey = dbConfig?.apiKey || config.llm.apiKey || ''
   const model = dbConfig?.model || config.llm.model || 'gpt-4o'
   const temperature = dbConfig?.temperature ?? 0.1
+  const source = dbConfig ? '数据库' : '环境变量'
+
+  return { baseURL, apiKey, model, temperature, source }
+}
+
+async function getLLM(): Promise<ChatOpenAI> {
+  const { baseURL, apiKey, model, temperature, source } = await getResolvedLlmConfig()
 
   if (!configLogged) {
-    const source = dbConfig ? '数据库' : '环境变量'
     logger.section('LLM', '大模型配置')
     logger.info('LLM', `配置来源: ${source}`)
     logger.info('LLM', `Base URL: ${baseURL}`)
@@ -95,4 +109,4 @@ async function getLLM(): Promise<ChatOpenAI> {
   })
 }
 
-export { getLLM, getActiveLlmConfig }
+export { getLLM, getActiveLlmConfig, getResolvedLlmConfig }

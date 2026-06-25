@@ -102,7 +102,7 @@
                 </div>
                 <div class="form-group">
                     <label>Base URL <span class="required">*</span></label>
-                    <input v-model="form.baseUrl" type="text" placeholder="https://api.openai.com/v1" />
+                    <input v-model="form.baseUrl" type="text" placeholder="https://api.openai.com/v1 或 https://opencode.ai/zen/go/v1/messages" />
                 </div>
                 <div class="form-group">
                     <label>API Key <span class="required">*</span></label>
