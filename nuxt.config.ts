@@ -29,5 +29,8 @@ export default defineNuxtConfig({
       apiKey: process.env.LLM_API_KEY || 'QC-bf1abcef0d24bbcfd549b61bc6d335ba-2f1e7634b1e33338a58c48e09a929c44',
       model: process.env.LLM_MODEL || 'Qwen3.5-Flash',
     },
+    paddleOcr: {
+      apiUrl: process.env.PADDLE_OCR_URL || 'http://localhost:8000/ocr',
+    },
   },
 })

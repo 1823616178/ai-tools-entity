@@ -1,0 +1,17 @@
+# PaddleOCR 服务依赖
+# 默认 CPU 版本；GPU 版本请把 paddlepaddle 替换为 paddlepaddle-gpu
+paddlepaddle==2.6.2
+paddleocr==2.8.1
+
+# Web 框架
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# 工具
+numpy==1.26.4
+opencv-python==4.10.0.84
+requests==2.32.3
+pillow==10.4.0
+
+# 数据校验
+pydantic==2.10.4
