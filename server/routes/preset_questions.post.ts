@@ -43,6 +43,44 @@ function formatHistoryForPrompt(questions: string[]): string {
   return questions.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
 }
 
+/**
+ * 从模型返回的文本中提取 JSON 对象
+ * 兼容不支持 response_format 的 provider（如部分 DeepSeek 渠道）
+ */
+function extractJsonFromText(text: string): unknown {
+  // 尝试直接解析整个文本
+  try {
+    return JSON.parse(text.trim())
+  }
+  catch {
+    // 忽略
+  }
+
+  // 尝试提取 ```json 代码块
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeBlockMatch) {
+    try {
+      return JSON.parse(codeBlockMatch[1].trim())
+    }
+    catch {
+      // 忽略
+    }
+  }
+
+  // 尝试提取第一个 JSON 对象/数组
+  const jsonMatch = text.match(/(\{[\s\S]*\})/)
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[1].trim())
+    }
+    catch {
+      // 忽略
+    }
+  }
+
+  return null
+}
+
 export default defineEventHandler(async (event) => {
   const MODULE = 'preset_questions'
   const startTime = Date.now()
@@ -83,24 +121,45 @@ export default defineEventHandler(async (event) => {
       '1. 输出问题数量必须恰好为 {targetCount} 条。',
       '2. 每条问题都要具体、自然、可直接提问。',
       '3. 推荐要与历史兴趣相关，同时保持多样化。',
-      '4. 不要输出重复问题，不要输出编号。',
+      '4. 不要输出重复问题。',
+      '5. 必须按下面格式严格输出 JSON（不要加 Markdown 代码块标记，不要输出额外说明）：',
+      '',
+      '{{"preset_questions": ["问题1", "问题2", ...]}}',
       '',
       '用户ID：{userId}',
       '历史问题列表：',
       '{history}',
     ].join('\n'))
 
-    const chain = prompt.pipe(llm.withStructuredOutput(presetQuestionsSchema))
-    const parsed = await chain.invoke({
+    const chain = prompt.pipe(llm)
+    const response = await chain.invoke({
       targetCount,
       userId: user_id.trim(),
       history: formatHistoryForPrompt(normalizedHistory),
     })
 
+    const rawText = typeof response.content === 'string'
+      ? response.content
+      : JSON.stringify(response.content)
+
+    logger.info(MODULE, `模型原始输出: ${rawText.slice(0, 200)}...`)
+
+    const extracted = extractJsonFromText(rawText)
+    const parsed = presetQuestionsSchema.safeParse(extracted)
+
+    if (!parsed.success) {
+      logger.error(MODULE, `模型输出解析失败: ${parsed.error.message}`)
+      return {
+        code: 500,
+        message: '模型输出格式异常',
+        preset_questions: [],
+      }
+    }
+
     const uniqueQuestions = Array.from(
       new Set(
-        (Array.isArray(parsed?.preset_questions) ? parsed.preset_questions : [])
-          .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        parsed.data.preset_questions
+          .map((item) => item.trim())
           .filter((item) => item.length > 0),
       ),
     )
@@ -124,7 +183,8 @@ export default defineEventHandler(async (event) => {
       message: 'success',
       preset_questions,
     }
-  } catch (error: any) {
+  }
+  catch (error: any) {
     logger.error(MODULE, error.message || '未知错误')
     return {
       code: 500,
@@ -133,4 +193,3 @@ export default defineEventHandler(async (event) => {
     }
   }
 })
-

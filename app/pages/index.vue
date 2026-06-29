@@ -7,15 +7,35 @@
                     <h1>古籍智能处理平台</h1>
                     <p class="subtitle">前端与文档接口保持一致</p>
                 </div>
-                <div class="header-links">
-                    <NuxtLink to="/hv-model" class="header-link">🤖 HV大模型</NuxtLink>
-                    <NuxtLink to="/qa-search" class="header-link">🔍 问答检索</NuxtLink>
-                    <NuxtLink to="/ner-external" class="header-link">🔌 外部NER</NuxtLink>
-                    <NuxtLink to="/paddle-ocr" class="header-link">📄 PaddleOCR</NuxtLink>
-                    <NuxtLink to="/admin" class="admin-link">⚙️ 配置管理</NuxtLink>
-                </div>
+                <nav class="header-links">
+                    <NuxtLink to="/" class="header-link">🏠 首页</NuxtLink>
+                    <NuxtLink to="/admin" class="header-link">⚙️ 配置</NuxtLink>
+                </nav>
             </div>
         </header>
+
+        <section class="feature-cards">
+            <NuxtLink to="/hv-model" class="feature-card">
+                <span class="feature-icon">🤖</span>
+                <span class="feature-name">HV大模型</span>
+                <span class="feature-desc">古文大模型对话</span>
+            </NuxtLink>
+            <NuxtLink to="/qa-search" class="feature-card">
+                <span class="feature-icon">🔍</span>
+                <span class="feature-name">问答检索</span>
+                <span class="feature-desc">古籍知识问答</span>
+            </NuxtLink>
+            <NuxtLink to="/paddle-ocr" class="feature-card">
+                <span class="feature-icon">📄</span>
+                <span class="feature-name">PaddleOCR</span>
+                <span class="feature-desc">图片/PDF 识别</span>
+            </NuxtLink>
+            <NuxtLink to="/ner-external" class="feature-card">
+                <span class="feature-icon">🔌</span>
+                <span class="feature-name">外部 NER</span>
+                <span class="feature-desc">实体标引工具</span>
+            </NuxtLink>
+        </section>
 
         <nav class="tab-nav">
             <button v-for="tab in tabs" :key="tab.key" :class="['tab-btn', { active: activeTab === tab.key }]"
@@ -906,45 +926,118 @@ body {
 .header-links {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .header-link {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 8px 16px;
+    padding: 6px 12px;
     background: #fff;
     color: #1a1a2e;
     text-decoration: none;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     border: 1.5px solid #1a1a2e;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
-.header-link:hover {
+.header-link:hover,
+.header-link.active {
     background: #1a1a2e;
     color: #fff;
 }
 
-.admin-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 8px 16px;
-    background: #1a1a2e;
+.header-more {
+    position: relative;
+}
+
+.more-btn {
+    cursor: pointer;
+    background: transparent;
     color: #fff;
-    text-decoration: none;
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.more-btn:hover,
+.more-btn.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+.more-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #fff;
     border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    padding: 6px;
+    min-width: 140px;
+    z-index: 100;
+}
+
+.dropdown-link {
+    display: block;
+    padding: 8px 12px;
+    color: #1a1a2e;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 13px;
     transition: background 0.2s;
 }
 
-.admin-link:hover {
-    background: #2d2d4a;
+.dropdown-link:hover {
+    background: #f0f5ff;
+}
+
+.feature-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.feature-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 20px 16px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    text-decoration: none;
+    color: #1a1a2e;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(26, 41, 128, 0.12);
+    border-color: #1a2980;
+}
+
+.feature-icon {
+    font-size: 28px;
+    margin-bottom: 4px;
+}
+
+.feature-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+}
+
+.feature-desc {
+    font-size: 12px;
+    color: #888;
+    text-align: center;
 }
 
 .tab-nav {
@@ -1568,11 +1661,7 @@ details summary {
 }
 
 .ocr-btn {
-    min-width: 160px;
-    padding: 14px 32px;
     font-size: 16px;
-    border-radius: 8px;
-    margin: 0 auto;
 }
 
 .ocr-result-card {
@@ -1712,6 +1801,36 @@ details summary {
 .preset-list li {
     margin-bottom: 8px;
     line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+    .header-main {
+        flex-direction: row;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .header-link {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+
+    .app-header {
+        padding: 20px 0 16px;
+    }
+
+    .app-header h1 {
+        font-size: 22px;
+    }
+
+    .feature-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .feature-card {
+        padding: 16px 12px;
+    }
 }
 
 @media (max-width: 600px) {
