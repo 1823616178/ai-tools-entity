@@ -12,6 +12,7 @@ numpy==1.26.4
 opencv-python==4.10.0.84
 requests==2.32.3
 pillow==10.4.0
+pdf2image==1.17.0
 
 # 数据校验
 pydantic==2.10.4

@@ -60,6 +60,30 @@ docker run -d \
 - Base64 字符串（可带 `data:image/xxx;base64,` 前缀）
 - HTTP(S) 图片 URL
 
+**响应：** 见下方 `/ocr/file` 中单页结构。
+
+### `POST /ocr/file`
+
+识别上传文件，支持图片、PDF、Office 文档（doc/docx/xls/xlsx/ppt/pptx）。
+
+Office 文档会先用 LibreOffice 转成 PDF，再逐页识别。
+
+**请求体：**
+
+```json
+{
+  "file": "data:application/pdf;base64,JVBERi0xLjQK...",
+  "filename": "example.pdf",
+  "return_lines": true,
+  "dpi": 200,
+  "max_pages": 50
+}
+```
+
+`file` 支持：
+- Base64 文件（可带 `data:xxx/yyy;base64,` 前缀）
+- HTTP(S) 文件 URL
+
 **响应：**
 
 ```json
@@ -67,21 +91,25 @@ docker run -d \
   "code": 200,
   "message": "success",
   "result": {
-    "text": "第一行\n第二行",
-    "lines": [
+    "filename": "example.pdf",
+    "file_type": "pdf",
+    "total_pages": 2,
+    "full_text": "--- 第 1 页 ---\n...",
+    "pages": [
       {
-        "text": "第一行",
-        "confidence": 0.98,
-        "box": {
-          "top_left": {"x": 10, "y": 10},
-          "top_right": {"x": 100, "y": 10},
-          "bottom_right": {"x": 100, "y": 30},
-          "bottom_left": {"x": 10, "y": 30}
-        }
+        "page": 1,
+        "text": "第一页文本",
+        "lines": [
+          {
+            "text": "第一行",
+            "confidence": 0.98,
+            "box": { "top_left": {...}, "top_right": {...}, "bottom_right": {...}, "bottom_left": {...} }
+          }
+        ],
+        "image_width": 1654,
+        "image_height": 2339
       }
-    ],
-    "image_width": 800,
-    "image_height": 600
+    ]
   }
 }
 ```

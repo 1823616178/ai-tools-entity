@@ -11,6 +11,7 @@
                     <NuxtLink to="/hv-model" class="header-link">🤖 HV大模型</NuxtLink>
                     <NuxtLink to="/qa-search" class="header-link">🔍 问答检索</NuxtLink>
                     <NuxtLink to="/ner-external" class="header-link">🔌 外部NER</NuxtLink>
+                    <NuxtLink to="/paddle-ocr" class="header-link">📄 PaddleOCR</NuxtLink>
                     <NuxtLink to="/admin" class="admin-link">⚙️ 配置管理</NuxtLink>
                 </div>
             </div>

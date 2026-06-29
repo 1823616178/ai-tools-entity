@@ -12,6 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender-dev \
     libgomp1 \
     libgl1-mesa-glx \
+    poppler-utils \
+    libreoffice \
+    fonts-wqy-zenhei \
+    fonts-wqy-microhei \
     wget \
     curl \
     && rm -rf /var/lib/apt/lists/*

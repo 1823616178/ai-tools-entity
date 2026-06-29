@@ -13,7 +13,8 @@ import cv2
 import numpy as np
 from config import Settings
 from paddleocr import PaddleOCR
-from schemas import Box, OCRResult, Point, TextLine
+from schemas import Box, OCRFileResult, OCRPageResult, OCRResult, Point, TextLine
+from utils import office_to_pdf, pdf_to_images
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,111 @@ class OCREngine:
             top_right=Point(x=float(coords[1][0]), y=float(coords[1][1])),
             bottom_right=Point(x=float(coords[2][0]), y=float(coords[2][1])),
             bottom_left=Point(x=float(coords[3][0]), y=float(coords[3][1])),
+        )
+
+    async def recognize_file(
+        self,
+        file_type: str,
+        file_bytes: bytes,
+        filename: str,
+        return_lines: bool = True,
+        dpi: int = 200,
+        max_pages: int = 0,
+    ) -> OCRFileResult:
+        """
+        识别上传文件：图片直接识别，PDF 逐页转换后识别，Office 文档先转 PDF
+        """
+        if file_type == "office":
+            loop = asyncio.get_running_loop()
+            try:
+                pdf_bytes = await loop.run_in_executor(
+                    self._executor,
+                    office_to_pdf,
+                    file_bytes,
+                    filename,
+                )
+            except Exception as exc:
+                raise ValueError(f"Office 文档转 PDF 失败: {exc}") from exc
+            return await self._recognize_pdf(
+                pdf_bytes,
+                filename,
+                return_lines=return_lines,
+                dpi=dpi,
+                max_pages=max_pages,
+            )
+
+        if file_type == "pdf":
+            return await self._recognize_pdf(
+                file_bytes,
+                filename,
+                return_lines=return_lines,
+                dpi=dpi,
+                max_pages=max_pages,
+            )
+
+        if file_type == "image":
+            img = cv2.imdecode(np.frombuffer(file_bytes, np.uint8), cv2.IMREAD_COLOR)
+            if img is None:
+                raise ValueError("无法解析图片")
+            result = await self.recognize(img, return_lines=return_lines)
+            page = OCRPageResult(
+                page=1,
+                text=result.text,
+                lines=result.lines,
+                image_width=result.image_width,
+                image_height=result.image_height,
+            )
+            return OCRFileResult(
+                filename=filename,
+                file_type="image",
+                total_pages=1,
+                pages=[page],
+                full_text=result.text,
+            )
+
+        raise ValueError(f"暂不支持的文件类型: {file_type}（当前仅支持图片和 PDF）")
+
+    async def _recognize_pdf(
+        self,
+        pdf_bytes: bytes,
+        filename: str,
+        return_lines: bool,
+        dpi: int,
+        max_pages: int,
+    ) -> OCRFileResult:
+        loop = asyncio.get_running_loop()
+        try:
+            images = await loop.run_in_executor(
+                self._executor,
+                pdf_to_images,
+                pdf_bytes,
+                dpi,
+                max_pages,
+            )
+        except Exception as exc:
+            raise ValueError(f"PDF 转换失败: {exc}") from exc
+
+        pages: List[OCRPageResult] = []
+        for idx, img in enumerate(images, start=1):
+            result = await self.recognize(img, return_lines=return_lines)
+            pages.append(
+                OCRPageResult(
+                    page=idx,
+                    text=result.text,
+                    lines=result.lines,
+                    image_width=result.image_width,
+                    image_height=result.image_height,
+                )
+            )
+
+        full_text = "\n\n".join(f"--- 第 {p.page} 页 ---\n{p.text}" for p in pages)
+
+        return OCRFileResult(
+            filename=filename,
+            file_type="pdf",
+            total_pages=len(pages),
+            pages=pages,
+            full_text=full_text,
         )
 
     async def close(self) -> None:

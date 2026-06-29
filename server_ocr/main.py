@@ -18,8 +18,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from ocr_engine import OCREngine
-from schemas import OCRRequest, OCRResponse, OCRResult
-from utils import decode_image, setup_logging
+from schemas import OCRFileRequest, OCRFileResult, OCRRequest, OCRResponse, OCRResult
+from utils import decode_file, decode_image, setup_logging
 
 settings = load_settings()
 setup_logging(settings.log_level)
@@ -120,6 +120,51 @@ async def ocr_endpoint(req: OCRRequest):
 async def ocr_base64(req: OCRRequest):
     """与 /ocr 等价，保留旧版兼容命名"""
     return await ocr_endpoint(req)
+
+
+@app.post("/ocr/file")
+async def ocr_file_endpoint(req: OCRFileRequest):
+    """
+    文件识别接口：支持图片和 PDF
+    """
+    if engine is None:
+        raise HTTPException(status_code=503, detail="OCR 引擎未加载")
+
+    start = time.time()
+    try:
+        file_type, file_bytes = decode_file(req.file, req.filename)
+    except ValueError as exc:
+        logger.warning(f"文件解析失败: {exc}")
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.warning(f"文件下载/解码异常: {exc}")
+        raise HTTPException(status_code=400, detail=f"文件处理失败: {exc}")
+
+    try:
+        result: OCRFileResult = await asyncio.wait_for(
+            engine.recognize_file(
+                file_type=file_type,
+                file_bytes=file_bytes,
+                filename=req.filename,
+                return_lines=req.return_lines,
+                dpi=req.dpi,
+                max_pages=req.max_pages,
+            ),
+            timeout=settings.request_timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.error("文件 OCR 推理超时")
+        raise HTTPException(status_code=504, detail="文件识别超时")
+    except Exception as exc:
+        logger.exception("文件 OCR 识别失败")
+        raise HTTPException(status_code=500, detail=f"文件识别失败: {exc}")
+
+    logger.info(
+        f"文件识别完成: {result.filename} | "
+        f"类型: {result.file_type} | 页数: {result.total_pages} | "
+        f"总耗时 {time.time() - start:.2f}s"
+    )
+    return {"code": 200, "message": "success", "result": result}
 
 
 if __name__ == "__main__":

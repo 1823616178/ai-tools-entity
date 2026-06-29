@@ -1,7 +1,9 @@
 """
 请求/响应数据模型
 """
+
 from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -42,6 +44,36 @@ class OCRRequest(BaseModel):
     return_base64: bool = Field(
         default=False,
         description="是否把识别结果中的坐标按原图尺寸返回（当前恒为 True）",
+    )
+
+
+class OCRPageResult(BaseModel):
+    page: int = Field(..., description="页码，从 1 开始")
+    text: str
+    lines: List[TextLine] = Field(default_factory=list)
+    image_width: Optional[int] = None
+    image_height: Optional[int] = None
+
+
+class OCRFileResult(BaseModel):
+    filename: str
+    file_type: str
+    total_pages: int
+    pages: List[OCRPageResult]
+    full_text: str
+
+
+class OCRFileRequest(BaseModel):
+    file: str = Field(
+        ...,
+        description="文件 base64（可带 data:application/pdf;base64 等 MIME 头）",
+    )
+    filename: str = Field(default="uploaded_file", description="原始文件名")
+    return_lines: bool = Field(default=True)
+    dpi: int = Field(default=200, description="PDF 转图片分辨率，默认 200")
+    max_pages: int = Field(
+        default=0,
+        description="最大识别页数，0 表示不限制",
     )
 
 
