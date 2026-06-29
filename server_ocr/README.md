@@ -122,6 +122,20 @@ Office 文档会先用 LibreOffice 转成 PDF，再逐页识别。
 
 就绪检查（Kubernetes 风格）。
 
+## 日志
+
+默认同时输出到控制台和按天滚动的日志文件 `server_ocr/logs/ocr.log`。
+
+可通过环境变量配置：
+
+| 变量 | 说明 | 默认值 |
+|---|---|---|
+| `OCR_LOG_LEVEL` | 日志级别（DEBUG/INFO/WARNING/ERROR） | `INFO` |
+| `OCR_LOG_DIR` | 日志目录 | `./logs` |
+| `OCR_LOG_FILE` | 日志文件名 | `ocr.log` |
+| `OCR_LOG_BACKUP_DAYS` | 保留日志天数 | `30` |
+| `OCR_LOG_REQUEST_BODY` | 是否记录请求体（含图片数据，谨慎开启） | `false` |
+
 ## 并发模型
 
 本服务采用三层并发控制：

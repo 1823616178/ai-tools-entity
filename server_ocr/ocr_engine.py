@@ -19,6 +19,22 @@ from utils import office_to_pdf, pdf_to_images
 logger = logging.getLogger(__name__)
 
 
+def _set_intel_gpu_device() -> None:
+    """设置 Paddle 使用 intel_gpu 自定义设备"""
+    try:
+        import paddle
+
+        device_types = paddle.device.get_all_custom_device_type()
+        logger.info(f"可用的 custom device 类型: {device_types}")
+        if "intel_gpu" not in device_types:
+            logger.warning("未检测到 intel_gpu 自定义设备，将回退到 CPU")
+            return
+        paddle.set_device("intel_gpu")
+        logger.info("已设置 paddle device 为 intel_gpu")
+    except Exception as exc:
+        logger.warning(f"设置 intel_gpu 设备失败: {exc}")
+
+
 class OCREngine:
     """
     并发安全设计：
@@ -39,7 +55,32 @@ class OCREngine:
 
     def load(self) -> None:
         """同步加载模型，应在 startup 中调用一次"""
+        logger.info("=" * 50)
         logger.info("正在加载 PaddleOCR 模型...")
+        logger.info(
+            f"配置: use_angle_cls={self.settings.ocr_use_angle_cls}, "
+            f"lang={self.settings.ocr_lang}, use_gpu={self.settings.ocr_use_gpu}, "
+            f"use_xpu={self.settings.ocr_use_xpu}, model_dir={self.settings.model_dir}"
+        )
+
+        # XPU 环境变量配置（当前默认适配 Intel Arc GPU / Intel XPU）
+        use_gpu = self.settings.ocr_use_gpu
+        if self.settings.ocr_use_xpu:
+            logger.info("启用 XPU (Intel GPU) 加速")
+            # Intel oneAPI / Level Zero 常用环境变量
+            os.environ.setdefault("SYCL_DEVICE_FILTER", "level_zero:gpu")
+            os.environ.setdefault("ONEAPI_DEVICE_SELECTOR", "level_zero:gpu")
+            # 如有多卡，可通过 ZE_AFFINITY_MASK 指定卡号，例如 "0"
+            # os.environ.setdefault("ZE_AFFINITY_MASK", "0")
+
+            # 设置 paddle 使用 intel_gpu 自定义设备
+            _set_intel_gpu_device()
+
+            # Intel GPU 模式下通常仍需要 use_gpu=True 让框架走异构后端
+            if not use_gpu:
+                logger.info("XPU 模式下自动设置 use_gpu=True")
+                use_gpu = True
+
         start = time.time()
 
         os.makedirs(self.settings.model_dir, exist_ok=True)
@@ -47,13 +88,14 @@ class OCREngine:
         self._ocr = PaddleOCR(
             use_angle_cls=self.settings.ocr_use_angle_cls,
             lang=self.settings.ocr_lang,
-            use_gpu=self.settings.ocr_use_gpu,
+            use_gpu=use_gpu,
             det_model_dir=os.path.join(self.settings.model_dir, "det"),
             rec_model_dir=os.path.join(self.settings.model_dir, "rec"),
             cls_model_dir=os.path.join(self.settings.model_dir, "cls"),
             show_log=False,
         )
         logger.info(f"PaddleOCR 模型加载完成，耗时 {time.time() - start:.2f}s")
+        logger.info("=" * 50)
 
     def warmup(self) -> None:
         """用空白图预热一次，避免首次请求过慢"""
@@ -78,6 +120,9 @@ class OCREngine:
         if self._ocr is None:
             raise RuntimeError("OCR 引擎尚未加载")
 
+        height, width = img.shape[:2]
+        logger.info(f"开始 OCR 识别, 图片尺寸: {width}x{height}")
+
         async with self._semaphore:
             loop = asyncio.get_running_loop()
             start = time.time()
@@ -86,8 +131,13 @@ class OCREngine:
                 self._sync_ocr,
                 img,
             )
-            logger.info(f"单次 OCR 推理耗时 {time.time() - start:.2f}s")
-            return self._format_result(raw_result, img, return_lines)
+            elapsed = time.time() - start
+            result = self._format_result(raw_result, img, return_lines)
+            logger.info(
+                f"OCR 识别完成, 图片尺寸: {width}x{height}, "
+                f"识别行数: {len(result.lines)}, 耗时: {elapsed:.2f}s"
+            )
+            return result
 
     def _sync_ocr(self, img: np.ndarray):
         """同步调用 PaddleOCR"""
@@ -220,6 +270,7 @@ class OCREngine:
         dpi: int,
         max_pages: int,
     ) -> OCRFileResult:
+        logger.info(f"开始识别 PDF: {filename}, 大小: {len(pdf_bytes)} bytes")
         loop = asyncio.get_running_loop()
         try:
             images = await loop.run_in_executor(
@@ -230,10 +281,14 @@ class OCREngine:
                 max_pages,
             )
         except Exception as exc:
+            logger.error(f"PDF 转换失败: {exc}")
             raise ValueError(f"PDF 转换失败: {exc}") from exc
+
+        logger.info(f"PDF 共 {len(images)} 页, 开始逐页识别...")
 
         pages: List[OCRPageResult] = []
         for idx, img in enumerate(images, start=1):
+            logger.info(f"识别 PDF 第 {idx}/{len(images)} 页")
             result = await self.recognize(img, return_lines=return_lines)
             pages.append(
                 OCRPageResult(
@@ -247,6 +302,7 @@ class OCREngine:
 
         full_text = "\n\n".join(f"--- 第 {p.page} 页 ---\n{p.text}" for p in pages)
 
+        logger.info(f"PDF 识别完成: {filename}, 共 {len(pages)} 页")
         return OCRFileResult(
             filename=filename,
             file_type="pdf",

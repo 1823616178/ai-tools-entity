@@ -33,10 +33,14 @@ services:
       OCR_MAX_CONCURRENT: 4
       OCR_THREAD_WORKERS: 4
       OCR_LOG_LEVEL: INFO
+      OCR_LOG_DIR: ./logs
+      OCR_LOG_FILE: ocr.log
+      OCR_LOG_BACKUP_DAYS: 30
     ports:
       - "8000:8000"
     volumes:
       - ./server_ocr/models:/app/models
+      - ./server_ocr/logs:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
