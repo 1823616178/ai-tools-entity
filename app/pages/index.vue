@@ -109,45 +109,80 @@
             </div>
         </section>
 
-        <section v-if="activeTab === 'ocr'" class="api-section">
-            <h2>拍照智能识别</h2>
-            <p class="desc">请求参数和返回结构均按文档中的 `/recognize/auto` 对齐。</p>
-            <div class="form-group">
-                <label>图片 Base64（data:image/...;base64,...）</label>
-                <textarea v-model="ocrForm.image" rows="4" placeholder="粘贴 Base64 图片数据..."></textarea>
+        <section v-if="activeTab === 'ocr'" class="api-section ocr-section">
+            <div class="section-title-row">
+                <h2>📷 拍照智能识别</h2>
+                <span class="powered-by">Powered by PaddleOCR</span>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>或选择图片文件</label>
-                    <input type="file" accept="image/*" @change="handleImageUpload" />
+            <p class="desc">上传古籍图片，自动识别文字并分类为单字、对联、诗词或古籍页面。</p>
+
+            <div class="ocr-upload-card">
+                <div :class="['ocr-drop-zone', { dragging: ocrDragging }]" @dragenter.prevent="ocrDragging = true"
+                    @dragleave.prevent="ocrDragging = false" @dragover.prevent @drop.prevent="handleOcrDrop"
+                    @click="triggerOcrFileInput">
+                    <input ref="ocrFileInput" type="file" accept="image/*" style="display: none"
+                        @change="handleImageUpload" />
+                    <div class="ocr-drop-content">
+                        <div class="ocr-drop-icon">📤</div>
+                        <p class="ocr-drop-main">点击或拖拽图片到此处</p>
+                        <p class="ocr-drop-hint">支持 JPG、PNG、BMP、WEBP 格式</p>
+                    </div>
                 </div>
+
+                <div v-if="ocrForm.preview" class="ocr-preview-card">
+                    <div class="ocr-preview-header">
+                        <span>🖼️ 图片预览</span>
+                        <button class="ocr-preview-remove" @click="clearOcrImage">移除</button>
+                    </div>
+                    <div class="image-preview ocr-preview-image">
+                        <img :src="ocrForm.preview" alt="预览" />
+                    </div>
+                </div>
+
+                <div class="ocr-actions">
+                    <button class="btn-primary ocr-btn" :disabled="!ocrForm.preview || ocrForm.loading"
+                        @click="handleOcr">
+                        <span v-if="ocrForm.loading" class="spinner"></span>
+                        {{ ocrForm.loading ? '识别中...' : '开始识别' }}
+                    </button>
+                </div>
+
+                <div v-if="ocrForm.error" class="error-msg">{{ ocrForm.error }}</div>
             </div>
-            <div v-if="ocrForm.preview" class="image-preview">
-                <img :src="ocrForm.preview" alt="预览" />
-            </div>
-            <button class="btn-primary" :disabled="ocrForm.loading" @click="handleOcr">
-                <span v-if="ocrForm.loading" class="spinner"></span>
-                {{ ocrForm.loading ? '识别中...' : '开始识别' }}
-            </button>
-            <div v-if="ocrForm.error" class="error-msg">{{ ocrForm.error }}</div>
-            <div v-if="ocrForm.result" class="result-box">
-                <h3>
-                    识别结果
-                    <span class="type-badge">{{ ocrForm.imageType }}</span>
-                </h3>
-                <div class="ocr-text">{{ ocrForm.ocrText }}</div>
-                <div v-if="ocrForm.imageType === 'couplet' && ocrForm.coupletData" class="couplet-display">
-                    <div class="couplet-line top-scroll">{{ ocrForm.coupletData.top_scroll }}</div>
+
+            <div v-if="ocrForm.result" class="ocr-result-card">
+                <div class="ocr-result-header">
+                    <h3>识别结果</h3>
+                    <div class="ocr-result-badges">
+                        <span class="type-badge" :class="getOcrTypeClass(ocrForm.imageType)">{{
+                            getOcrTypeLabel(ocrForm.imageType) }}</span>
+                        <button class="btn-copy" @click="copyOcrText">📋 复制文本</button>
+                    </div>
+                </div>
+
+                <div class="ocr-text-block">
+                    <div class="ocr-text-label">原始文本</div>
+                    <div class="ocr-text">{{ ocrForm.ocrText }}</div>
+                </div>
+
+                <div v-if="ocrForm.imageType === 'couplet' && ocrForm.coupletData" class="couplet-display ocr-couplet">
+                    <div v-if="ocrForm.coupletData.top_scroll" class="couplet-line top-scroll">{{
+                        ocrForm.coupletData.top_scroll }}</div>
                     <div class="couplet-pair">
                         <div class="couplet-line">{{ ocrForm.coupletData.first_line }}</div>
                         <div class="couplet-line">{{ ocrForm.coupletData.second_line }}</div>
                     </div>
+                    <div v-if="ocrForm.coupletData.signature" class="couplet-signature">落款：{{
+                        ocrForm.coupletData.signature }}</div>
                 </div>
-                <div v-if="ocrForm.imageType === 'poem' && ocrForm.poemData" class="poem-display">
-                    <h4>{{ ocrForm.poemData.title }} · {{ ocrForm.poemData.author }}</h4>
+
+                <div v-if="ocrForm.imageType === 'poem' && ocrForm.poemData" class="poem-display ocr-poem">
+                    <h4>{{ ocrForm.poemData.title || '无题' }}{{ ocrForm.poemData.author ? ` · ${ocrForm.poemData.author}`
+                        : '' }}</h4>
                     <p>{{ ocrForm.poemData.content }}</p>
                 </div>
-                <details>
+
+                <details class="ocr-json-details">
                     <summary>查看 JSON 详情</summary>
                     <pre class="json-output">{{ JSON.stringify(ocrForm.result, null, 2) }}</pre>
                 </details>
@@ -541,6 +576,8 @@ const ocrForm = reactive({
     coupletData: null as Record<string, any> | null,
     poemData: null as Record<string, any> | null,
 })
+const ocrDragging = ref(false)
+const ocrFileInput = ref<HTMLInputElement | null>(null)
 
 function resetOcrPresentation() {
     ocrForm.result = null
@@ -572,13 +609,62 @@ function applyOcrPresentation(result: OcrResult | null) {
 function handleImageUpload(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0]
     if (!file) return
+    loadOcrImage(file)
+}
 
+function handleOcrDrop(e: DragEvent) {
+    ocrDragging.value = false
+    const file = e.dataTransfer?.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+        loadOcrImage(file)
+    }
+}
+
+function loadOcrImage(file: File) {
+    resetOcrPresentation()
+    ocrForm.error = ''
     const reader = new FileReader()
     reader.onload = () => {
         ocrForm.image = reader.result as string
         ocrForm.preview = reader.result as string
     }
     reader.readAsDataURL(file)
+}
+
+function triggerOcrFileInput() {
+    ocrFileInput.value?.click()
+}
+
+function clearOcrImage() {
+    ocrForm.image = ''
+    ocrForm.preview = ''
+    resetOcrPresentation()
+    if (ocrFileInput.value) ocrFileInput.value.value = ''
+}
+
+async function copyOcrText() {
+    if (!ocrForm.ocrText) return
+    try {
+        await navigator.clipboard.writeText(ocrForm.ocrText)
+        alert('识别文本已复制到剪贴板')
+    }
+    catch {
+        alert('复制失败，请手动选择文本复制')
+    }
+}
+
+function getOcrTypeLabel(type: string) {
+    const map: Record<string, string> = {
+        single_char: '单字',
+        couplet: '对联',
+        poem: '诗词',
+        ancient_book: '古籍',
+    }
+    return map[type] || type || '未知'
+}
+
+function getOcrTypeClass(type: string) {
+    return `type-${type || 'default'}`
 }
 
 async function handleOcr() {
@@ -1350,6 +1436,274 @@ details summary {
     box-shadow: inset 0 0 0 1px rgba(126, 90, 50, 0.12);
 }
 
+/* ===== OCR 拍照识别增强样式 ===== */
+.section-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.section-title-row h2 {
+    margin: 0;
+}
+
+.powered-by {
+    font-size: 12px;
+    color: #666;
+    background: #f0f5ff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid #d6e4ff;
+}
+
+.ocr-section .desc {
+    margin-bottom: 20px;
+}
+
+.ocr-upload-card {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.ocr-drop-zone {
+    border: 2px dashed #c9c9c9;
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+}
+
+.ocr-drop-zone:hover,
+.ocr-drop-zone.dragging {
+    border-color: #1a2980;
+    background: linear-gradient(135deg, #f0f5ff 0%, #e6f0ff 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(26, 41, 128, 0.1);
+}
+
+.ocr-drop-content {
+    pointer-events: none;
+}
+
+.ocr-drop-icon {
+    font-size: 56px;
+    margin-bottom: 12px;
+    opacity: 0.85;
+}
+
+.ocr-drop-main {
+    font-size: 16px;
+    color: #333;
+    margin: 0 0 8px;
+    font-weight: 500;
+}
+
+.ocr-drop-hint {
+    font-size: 13px;
+    color: #999;
+    margin: 0;
+}
+
+.ocr-preview-card {
+    margin-top: 20px;
+    border: 1px solid #e4e7ed;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.ocr-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f5f7fa;
+    border-bottom: 1px solid #e4e7ed;
+    font-size: 14px;
+    color: #555;
+}
+
+.ocr-preview-remove {
+    background: none;
+    border: none;
+    color: #f56c6c;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.ocr-preview-remove:hover {
+    background: #fff0f0;
+}
+
+.ocr-preview-image {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+}
+
+.ocr-preview-image img {
+    max-height: 360px;
+    width: 100%;
+    object-fit: contain;
+}
+
+.ocr-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+.ocr-btn {
+    min-width: 160px;
+    padding: 14px 32px;
+    font-size: 16px;
+    border-radius: 8px;
+    margin: 0 auto;
+}
+
+.ocr-result-card {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ocr-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.ocr-result-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #1a1a2e;
+}
+
+.ocr-result-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-copy {
+    background: #fff;
+    border: 1px solid #d9d9d9;
+    color: #555;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-copy:hover {
+    border-color: #1a2980;
+    color: #1a2980;
+    background: #f0f5ff;
+}
+
+.ocr-text-block {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.ocr-text-label {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.ocr-text-block .ocr-text {
+    margin: 0;
+    font-size: 16px;
+    line-height: 2;
+}
+
+.ocr-couplet {
+    margin-top: 0;
+}
+
+.couplet-signature {
+    margin-top: 16px;
+    font-size: 14px;
+    color: #7c5e4a;
+    text-align: right;
+    font-style: italic;
+}
+
+.ocr-poem {
+    margin-top: 0;
+}
+
+.ocr-json-details {
+    margin-top: 20px;
+}
+
+.ocr-json-details summary {
+    color: #666;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* OCR 类型徽章 */
+.type-single_char {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    color: #1565c0;
+}
+
+.type-couplet {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    color: #e65100;
+}
+
+.type-poem {
+    background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+    color: #7b1fa2;
+}
+
+.type-ancient_book {
+    background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+    color: #2e7d32;
+}
+
 .preset-list {
     margin: 0;
     padding-left: 20px;
@@ -1379,6 +1733,19 @@ details summary {
         font-size: 18px;
         line-height: 1.9;
         padding: 18px 12px;
+    }
+
+    .ocr-result-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ocr-drop-zone {
+        padding: 36px 16px;
+    }
+
+    .ocr-btn {
+        width: 100%;
     }
 }
 </style>
