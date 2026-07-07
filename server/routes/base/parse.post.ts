@@ -1,14 +1,6 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { z } from 'zod'
 import { getLLM } from '../../utils/llm'
 import { logger } from '../../utils/logger'
-
-const parseResultSchema = z.object({
-  items: z.array(z.object({
-    pos: z.number().describe('标点插入位置（字符索引），表示在第 pos 个字符之后插入标点，从 1 开始计数'),
-    punc: z.array(z.string()).describe('该位置插入的标点符号列表'),
-  })).describe('句读结果列表'),
-})
 
 export default defineEventHandler(async (event) => {
   const MODULE = 'base/parse'
@@ -49,13 +41,24 @@ export default defineEventHandler(async (event) => {
       '输出：[{{"pos":2,"punc":["："]}},{{"pos":7,"punc":["，"]}},{{"pos":11,"punc":["？"]}}]',
       '解释：子曰：學而時習之，不亦說乎？',
       '',
+      '## 重要：只输出 JSON 数组，不要输出任何解释文字',
+      '',
       '## 待句读古文',
       '{content}',
     ].join('\n'))
 
-    const chain = prompt.pipe(llm.withStructuredOutput(parseResultSchema))
-    const parsed = await chain.invoke({ content })
-    const results = Array.isArray(parsed?.items) ? parsed.items : []
+    const messages = await prompt.formatMessages({ content })
+    const response = await llm.invoke(messages)
+    const raw = typeof response.content === 'string' ? response.content.trim() : String(response.content || '').trim()
+
+    // 提取 JSON 数组部分（防止模型输出多余文字）
+    const match = raw.match(/\[[\s\S]*\]/m)
+    if (!match) {
+      throw new Error(`无法解析模型输出: ${raw.slice(0, 200)}`)
+    }
+
+    const parsed = JSON.parse(match[0])
+    const results = Array.isArray(parsed) ? parsed : []
 
     logger.info(MODULE, `标点数量: ${results.length}`)
     logger.section(MODULE, `请求完成, 总耗时: ${Date.now() - startTime}ms`)
