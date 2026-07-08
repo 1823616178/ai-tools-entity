@@ -105,8 +105,8 @@ export default defineEventHandler(async (event) => {
     const uniqueQuestions = Array.from(
       new Set(
         (Array.isArray(parsed?.follow_up_questions) ? parsed.follow_up_questions : [])
-          .map((item) => (typeof item === 'string' ? item.trim() : ''))
-          .filter((item) => item.length > 0),
+          .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
+          .filter((item: string) => item.length > 0),
       ),
     )
 

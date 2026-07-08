@@ -99,12 +99,13 @@ class OCREngine:
 
     def warmup(self) -> None:
         """用空白图预热一次，避免首次请求过慢"""
-        if not self.settings.enable_warmup:
+        ocr = self._ocr
+        if not self.settings.enable_warmup or ocr is None:
             return
         logger.info("模型预热中...")
         dummy = np.zeros((100, 100, 3), dtype=np.uint8)
         try:
-            self._ocr.ocr(dummy, cls=self.settings.ocr_use_angle_cls)
+            ocr.ocr(dummy, cls=self.settings.ocr_use_angle_cls)
             logger.info("模型预热完成")
         except Exception as exc:
             logger.warning(f"模型预热失败（不影响服务）: {exc}")
@@ -141,9 +142,12 @@ class OCREngine:
 
     def _sync_ocr(self, img: np.ndarray):
         """同步调用 PaddleOCR"""
+        ocr = self._ocr
+        if ocr is None:
+            raise RuntimeError("OCR 引擎尚未加载")
         # 浅拷贝避免多线程下对同一张图的并发修改问题
         img_copy = img.copy()
-        return self._ocr.ocr(
+        return ocr.ocr(
             img_copy,
             cls=self.settings.ocr_use_angle_cls,
         )
