@@ -13,7 +13,7 @@ function clampMaxQuestions(value: unknown): number {
 }
 
 function formatConversationHistory(
-  history: Array<{ role: string; content: string }>,
+  history: Array<{ role: string; content: string; timestamp?: string }>,
 ): string {
   if (!history.length) return '(无历史对话)'
   return history
@@ -24,6 +24,13 @@ function formatConversationHistory(
     .join('\n')
 }
 
+function getLastUserQuestion(
+  history: Array<{ role: string; content: string }>,
+): string {
+  const lastUserMsg = [...history].reverse().find((item) => item.role === 'user')
+  return lastUserMsg?.content?.trim() || '用户当前问题未知'
+}
+
 export default defineEventHandler(async (event) => {
   const MODULE = 'follow_up_questions'
   const startTime = Date.now()
@@ -31,42 +38,36 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = await readBody(event)
-    const { query, conversation_history, max_questions } = body || {}
-
-    if (!query || typeof query !== 'string' || !query.trim()) {
-      return {
-        code: 400,
-        message: '请求参数无效（如 query 为空）',
-        follow_up_questions: [],
-      }
-    }
+    const { conversation_history, max_questions } = body || {}
 
     if (
-      conversation_history !== undefined &&
-      (!Array.isArray(conversation_history) ||
-        !conversation_history.every(
-          (item: any) =>
-            typeof item === 'object' &&
-            item !== null &&
-            typeof item.role === 'string' &&
-            (item.role === 'user' || item.role === 'assistant') &&
-            typeof item.content === 'string',
-        ))
+      !conversation_history ||
+      !Array.isArray(conversation_history) ||
+      conversation_history.length === 0 ||
+      !conversation_history.every(
+        (item: any) =>
+          typeof item === 'object' &&
+          item !== null &&
+          typeof item.role === 'string' &&
+          (item.role === 'user' || item.role === 'assistant') &&
+          typeof item.content === 'string' &&
+          (item.timestamp === undefined || typeof item.timestamp === 'string'),
+      )
     ) {
       return {
         code: 400,
-        message: '请求参数无效（如 conversation_history 格式错误）',
+        message: '请求参数无效（conversation_history 不能为空或格式错误）',
         follow_up_questions: [],
       }
     }
 
     const targetCount = clampMaxQuestions(max_questions)
-    const history = Array.isArray(conversation_history) ? conversation_history : []
 
-    logger.info(MODULE, `query: ${query.trim()}`)
-    logger.info(MODULE, `历史对话数量: ${history.length}, 目标追问数量: ${targetCount}`)
+    logger.info(MODULE, `历史对话数量: ${conversation_history.length}, 目标追问数量: ${targetCount}`)
 
-    const historyText = formatConversationHistory(history)
+    const question = getLastUserQuestion(conversation_history)
+    const historyText = formatConversationHistory(conversation_history)
+
     const promptText = [
       '请根据用户当前的问题和历史对话记录，生成 ' + targetCount + ' 个进一步追问的问题。',
       '',
@@ -80,7 +81,7 @@ export default defineEventHandler(async (event) => {
       '## 重要：请严格按以下 JSON 格式输出，不要包含 ```json 等代码块标记，不要输出任何解释文字',
       '{"follow_up_questions": ["问题1", "问题2", "问题3"]}',
       '',
-      '当前用户问题：' + query.trim(),
+      '当前用户问题：' + question,
       '',
       '历史对话记录：',
       historyText,
