@@ -1,5 +1,4 @@
-import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { getLLM } from '../../utils/llm'
+import { generateText } from '../../utils/textGeneration'
 import { logger } from '../../utils/logger'
 
 export default defineEventHandler(async (event) => {
@@ -19,8 +18,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const llm = await getLLM()
-    const prompt = ChatPromptTemplate.fromTemplate([
+    const prompt = [
       '你是古文翻译专家。',
       '请将输入的古文翻译成现代汉语。',
       '要求：',
@@ -30,14 +28,12 @@ export default defineEventHandler(async (event) => {
       '4. 只输出最终翻译文本，不要解释。',
       '',
       '古文：',
-      '{content}',
+      content,
       '',
       '翻译结果：',
-    ].join('\n'))
+    ].join('\n')
 
-    const chain = prompt.pipe(llm)
-    const response = await chain.invoke({ content })
-    const results = typeof response.content === 'string' ? response.content.trim() : String(response.content || '').trim()
+    const results = await generateText([{ role: 'user', content: prompt }])
 
     logger.info(MODULE, `结果长度: ${results.length}`)
     logger.section(MODULE, `请求完成, 总耗时: ${Date.now() - startTime}ms`)

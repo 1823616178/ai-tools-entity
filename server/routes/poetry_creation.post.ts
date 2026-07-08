@@ -1,5 +1,4 @@
-import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { getLLM } from '../utils/llm'
+import { generateText } from '../utils/textGeneration'
 import { logger } from '../utils/logger'
 
 export default defineEventHandler(async (event) => {
@@ -19,8 +18,7 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const llm = await getLLM()
-    const prompt = ChatPromptTemplate.fromTemplate([
+    const prompt = [
       '你是古典诗词创作专家。',
       '请根据用户要求创作一首符合古典文学规范的诗词作品。',
       '要求：',
@@ -29,14 +27,12 @@ export default defineEventHandler(async (event) => {
       '3. 只输出最终诗词正文，不要解释、不要标题前后缀。',
       '',
       '用户要求：',
-      '{requestText}',
+      request_text.trim(),
       '',
       '诗词：',
-    ].join('\n'))
+    ].join('\n')
 
-    const chain = prompt.pipe(llm)
-    const response = await chain.invoke({ requestText: request_text.trim() })
-    const result = typeof response.content === 'string' ? response.content.trim() : String(response.content || '').trim()
+    const result = await generateText([{ role: 'user', content: prompt }])
 
     logger.info(MODULE, `结果长度: ${result.length}`)
     logger.section(MODULE, `请求完成, 总耗时: ${Date.now() - startTime}ms`)

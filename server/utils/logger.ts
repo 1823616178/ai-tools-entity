@@ -8,7 +8,7 @@ let fileLoggingWarningShown = false
 
 function resolveWritableLogDir(): string | null {
   const candidates = [
-    process.env.LOG_DIR,
+    process.env.NUXT_LOG_DIR,
     path.resolve(process.cwd(), 'logs'),
     path.join(os.tmpdir(), 'aiTool-logs'),
   ].filter((value): value is string => Boolean(value))

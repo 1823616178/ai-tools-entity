@@ -1,5 +1,4 @@
-import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { getLLM } from '../utils/llm'
+import { generateText } from '../utils/textGeneration'
 import { logger } from '../utils/logger'
 
 export default defineEventHandler(async (event) => {
@@ -27,33 +26,24 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    const llm = await getLLM()
-
-    const prompt = ChatPromptTemplate.fromTemplate([
+    const prompt = [
       '你是 OCR 结果格式转换专家。',
       '请根据 recognition_context 中已有的识别上下文，将内容整理为目标类型。',
-      '目标类型：{targetType}',
+      '目标类型：' + target_type,
       'couplet 需包含 first_line、second_line、top_scroll、signature。',
       'poem 需包含 title、author、content、signature。',
       'single_char 和 ancient_book 的 data 为 {}。',
       '如果无法可靠提取字段，允许返回空字符串，但 image_type 仍需等于目标类型。',
       '',
-      'vl_ocr_result: {vl}',
-      'guji_ocr_result: {guji}',
-      'danzi_ocr_result: {danzi}',
+      'vl_ocr_result: ' + (recognition_context.vl_ocr_result || ''),
+      'guji_ocr_result: ' + (recognition_context.guji_ocr_result || ''),
+      'danzi_ocr_result: ' + (recognition_context.danzi_ocr_result || ''),
       '',
       '## 重要：只输出 JSON，格式如下，不要输出任何解释文字',
-      '{{"display": {{"ocr_result": "...", "image_type": "{targetType}", "data": {{...}}}}}}',
-    ].join('\n'))
+      '{"display": {"ocr_result": "...", "image_type": "' + target_type + '", "data": {}}}',
+    ].join('\n')
 
-    const messages = await prompt.formatMessages({
-      targetType: target_type,
-      vl: recognition_context.vl_ocr_result || '',
-      guji: recognition_context.guji_ocr_result || '',
-      danzi: recognition_context.danzi_ocr_result || '',
-    })
-    const response = await llm.invoke(messages)
-    const raw = typeof response.content === 'string' ? response.content.trim() : String(response.content || '').trim()
+    const raw = await generateText([{ role: 'user', content: prompt }])
 
     const match = raw.match(/\{[\s\S]*\}/m)
     if (!match) {

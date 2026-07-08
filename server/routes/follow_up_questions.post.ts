@@ -1,5 +1,4 @@
-import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { getLLM } from '../utils/llm'
+import { generateText } from '../utils/textGeneration'
 import { logger } from '../utils/logger'
 
 const DEFAULT_MAX_QUESTIONS = 3
@@ -14,14 +13,13 @@ function clampMaxQuestions(value: unknown): number {
 }
 
 function formatConversationHistory(
-  history: Array<{ role: string; content: string; timestamp?: string }>,
+  history: Array<{ role: string; content: string }>,
 ): string {
   if (!history.length) return '(无历史对话)'
   return history
     .map((item) => {
       const role = item.role === 'user' ? '用户' : '助手'
-      const time = item.timestamp ? ` [${item.timestamp}]` : ''
-      return `${role}${time}：${item.content}`
+      return `${role}：${item.content}`
     })
     .join('\n')
 }
@@ -52,8 +50,7 @@ export default defineEventHandler(async (event) => {
             item !== null &&
             typeof item.role === 'string' &&
             (item.role === 'user' || item.role === 'assistant') &&
-            typeof item.content === 'string' &&
-            (item.timestamp === undefined || typeof item.timestamp === 'string'),
+            typeof item.content === 'string',
         ))
     ) {
       return {
@@ -69,32 +66,27 @@ export default defineEventHandler(async (event) => {
     logger.info(MODULE, `query: ${query.trim()}`)
     logger.info(MODULE, `历史对话数量: ${history.length}, 目标追问数量: ${targetCount}`)
 
-    const llm = await getLLM()
-    const prompt = ChatPromptTemplate.fromTemplate([
-      '你是智能问答助手的追问生成器。',
-      '请根据用户当前的问题和历史对话记录，生成 {targetCount} 个进一步追问的问题。',
+    const historyText = formatConversationHistory(history)
+    const promptText = [
+      '请根据用户当前的问题和历史对话记录，生成 ' + targetCount + ' 个进一步追问的问题。',
+      '',
       '要求：',
       '1. 追问问题要围绕当前话题深入展开，引导用户获取更有价值的信息。',
       '2. 每个问题要具体、自然、可直接提问。',
       '3. 问题之间要保持多样化，从不同角度切入。',
       '4. 不要输出与历史对话中已回答过的问题重复的内容。',
-      '5. 输出问题数量必须恰好为 {targetCount} 条，不要输出编号。',
+      '5. 输出问题数量必须恰好为 ' + targetCount + ' 条，不要输出编号。',
       '',
-      '## 重要：请严格按以下 JSON 格式输出，不要输出任何解释文字',
-      '{{"follow_up_questions": ["问题1", "问题2", "问题3"]}}',
+      '## 重要：请严格按以下 JSON 格式输出，不要包含 ```json 等代码块标记，不要输出任何解释文字',
+      '{"follow_up_questions": ["问题1", "问题2", "问题3"]}',
       '',
-      '当前用户问题：{query}',
+      '当前用户问题：' + query.trim(),
+      '',
       '历史对话记录：',
-      '{history}',
-    ].join('\n'))
+      historyText,
+    ].join('\n')
 
-    const messages = await prompt.formatMessages({
-      targetCount,
-      query: query.trim(),
-      history: formatConversationHistory(history),
-    })
-    const response = await llm.invoke(messages)
-    const raw = typeof response.content === 'string' ? response.content.trim() : String(response.content || '').trim()
+    const raw = await generateText([{ role: 'user', content: promptText }])
 
     const match = raw.match(/\{[\s\S]*\}/m)
     if (!match) {

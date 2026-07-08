@@ -1,16 +1,10 @@
-import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { z } from 'zod'
-import { getLLM } from '../utils/llm'
+import { generateText } from '../utils/textGeneration'
 import { logger } from '../utils/logger'
 
 const MAX_HISTORY_ITEMS = 200
 const MAX_HISTORY_CHARS = 20000
 const MIN_PRESET_COUNT = 5
 const MAX_PRESET_COUNT = 10
-
-const presetQuestionsSchema = z.object({
-  preset_questions: z.array(z.string().min(1)),
-})
 
 function clampPresetCount(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) return MAX_PRESET_COUNT
@@ -43,38 +37,28 @@ function formatHistoryForPrompt(questions: string[]): string {
   return questions.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
 }
 
-/**
- * 从模型返回的文本中提取 JSON 对象
- * 兼容不支持 response_format 的 provider（如部分 DeepSeek 渠道）
- */
 function extractJsonFromText(text: string): unknown {
-  // 尝试直接解析整个文本
   try {
     return JSON.parse(text.trim())
-  }
-  catch {
-    // 忽略
+  } catch {
+    // ignore
   }
 
-  // 尝试提取 ```json 代码块
   const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (codeBlockMatch) {
     try {
       return JSON.parse(codeBlockMatch[1].trim())
-    }
-    catch {
-      // 忽略
+    } catch {
+      // ignore
     }
   }
 
-  // 尝试提取第一个 JSON 对象/数组
   const jsonMatch = text.match(/(\{[\s\S]*\})/)
   if (jsonMatch) {
     try {
       return JSON.parse(jsonMatch[1].trim())
-    }
-    catch {
-      // 忽略
+    } catch {
+      // ignore
     }
   }
 
@@ -113,42 +97,40 @@ export default defineEventHandler(async (event) => {
     logger.info(MODULE, `user_id: ${user_id.trim()}`)
     logger.info(MODULE, `历史问题数量: ${normalizedHistory.length}, 总字数: ${totalChars}, 目标返回数量: ${targetCount}`)
 
-    const llm = await getLLM()
-    const prompt = ChatPromptTemplate.fromTemplate([
+    const prompt = [
       '你是问题推荐助手。',
       '请基于用户近30天历史问题，生成用户下一步可能感兴趣的预设问题推荐。',
       '要求：',
-      '1. 输出问题数量必须恰好为 {targetCount} 条。',
+      '1. 输出问题数量必须恰好为 ' + targetCount + ' 条。',
       '2. 每条问题都要具体、自然、可直接提问。',
       '3. 推荐要与历史兴趣相关，同时保持多样化。',
       '4. 不要输出重复问题。',
       '5. 必须按下面格式严格输出 JSON（不要加 Markdown 代码块标记，不要输出额外说明）：',
       '',
-      '{{"preset_questions": ["问题1", "问题2", ...]}}',
+      '{"preset_questions": ["问题1", "问题2", ...]}',
       '',
-      '用户ID：{userId}',
+      '用户ID：' + user_id.trim(),
       '历史问题列表：',
-      '{history}',
-    ].join('\n'))
+      formatHistoryForPrompt(normalizedHistory),
+    ].join('\n')
 
-    const chain = prompt.pipe(llm)
-    const response = await chain.invoke({
-      targetCount,
-      userId: user_id.trim(),
-      history: formatHistoryForPrompt(normalizedHistory),
-    })
-
-    const rawText = typeof response.content === 'string'
-      ? response.content
-      : JSON.stringify(response.content)
+    const rawText = await generateText([{ role: 'user', content: prompt }])
 
     logger.info(MODULE, `模型原始输出: ${rawText.slice(0, 200)}...`)
 
     const extracted = extractJsonFromText(rawText)
-    const parsed = presetQuestionsSchema.safeParse(extracted)
+    if (!extracted || typeof extracted !== 'object') {
+      logger.error(MODULE, `模型输出解析失败`)
+      return {
+        code: 500,
+        message: '模型输出格式异常',
+        preset_questions: [],
+      }
+    }
 
-    if (!parsed.success) {
-      logger.error(MODULE, `模型输出解析失败: ${parsed.error.message}`)
+    const preset_questions_raw = (extracted as any)?.preset_questions
+    if (!Array.isArray(preset_questions_raw)) {
+      logger.error(MODULE, `模型输出格式异常: preset_questions 不是数组`)
       return {
         code: 500,
         message: '模型输出格式异常',
@@ -158,8 +140,8 @@ export default defineEventHandler(async (event) => {
 
     const uniqueQuestions = Array.from(
       new Set(
-        parsed.data.preset_questions
-          .map((item) => item.trim())
+        preset_questions_raw
+          .map((item) => (typeof item === 'string' ? item.trim() : ''))
           .filter((item) => item.length > 0),
       ),
     )
@@ -183,8 +165,7 @@ export default defineEventHandler(async (event) => {
       message: 'success',
       preset_questions,
     }
-  }
-  catch (error: any) {
+  } catch (error: any) {
     logger.error(MODULE, error.message || '未知错误')
     return {
       code: 500,

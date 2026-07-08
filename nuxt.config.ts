@@ -9,28 +9,29 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     db: {
-      host: process.env.DB_HOST || '192.168.1.111',
-      port: parseInt(process.env.DB_PORT || '53306', 10),
-      username: process.env.DB_USERNAME || 'hanvon',
-      password: process.env.DB_PASSWORD || 'hanvon123',
-      database: process.env.DB_DATABASE || 'aitool',
+      host: '192.168.1.111',
+      port: 53306,
+      username: 'hanvon',
+      password: 'hanvon123',
+      database: 'aitool',
     },
     redis: {
-      host: process.env.REDIS_HOST || '192.168.1.166',
-      port: parseInt(process.env.REDIS_PORT || '56379', 10),
-      password: process.env.REDIS_PASSWORD || 'digital@Library',
-      db: parseInt(process.env.REDIS_DB || '0', 10),
+      host: '192.168.1.166',
+      port: 56379,
+      password: 'digital@Library',
+      db: 0,
     },
     ner: {
-      apiUrl: process.env.NER_API_URL || 'http://192.168.1.45:54104/predict',
+      apiUrl: 'http://192.168.1.45:54104/predict',
     },
     llm: {
-      baseUrl: process.env.LLM_BASE_URL || 'https://aiping.cn/api/v1',
-      apiKey: process.env.LLM_API_KEY || 'QC-bf1abcef0d24bbcfd549b61bc6d335ba-2f1e7634b1e33338a58c48e09a929c44',
-      model: process.env.LLM_MODEL || 'Qwen3.5-Flash',
+      baseUrl: 'https://api.deepseek.com/v1/chat/completions',
+      apiKey: 'sk-0c5773fdc60d46b7afd79caa6cb2ce97',
+      model: 'deepseek-v4-flash',
     },
     paddleOcr: {
-      apiUrl: process.env.PADDLE_OCR_URL || 'http://192.168.1.45:8000/ocr',
+      apiUrl: 'http://192.168.1.45:8000/ocr',
     },
+    logDir: './logs',
   },
 })
