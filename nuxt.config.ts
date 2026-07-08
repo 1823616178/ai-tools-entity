@@ -30,7 +30,7 @@ export default defineNuxtConfig({
       model: process.env.LLM_MODEL || 'Qwen3.5-Flash',
     },
     paddleOcr: {
-      apiUrl: process.env.PADDLE_OCR_URL || 'http://localhost:8000/ocr',
+      apiUrl: process.env.PADDLE_OCR_URL || 'http://192.168.1.45:8000/ocr',
     },
   },
 })
