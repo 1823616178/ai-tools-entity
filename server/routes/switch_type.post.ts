@@ -1,15 +1,6 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { z } from 'zod'
 import { getLLM } from '../utils/llm'
 import { logger } from '../utils/logger'
-
-const switchTypeResultSchema = z.object({
-  display: z.object({
-    ocr_result: z.string().describe('整理后的文本内容'),
-    image_type: z.string().describe('目标类型：couplet、poem、single_char、ancient_book'),
-    data: z.object({}).passthrough().describe('类型相关数据'),
-  }),
-})
 
 export default defineEventHandler(async (event) => {
   const MODULE = 'switch_type'
@@ -50,27 +41,35 @@ export default defineEventHandler(async (event) => {
       'vl_ocr_result: {vl}',
       'guji_ocr_result: {guji}',
       'danzi_ocr_result: {danzi}',
+      '',
+      '## 重要：只输出 JSON，格式如下，不要输出任何解释文字',
+      '{{"display": {{"ocr_result": "...", "image_type": "{targetType}", "data": {{...}}}}}}',
     ].join('\n'))
 
-    const chain = prompt.pipe(llm.withStructuredOutput(switchTypeResultSchema))
-    const parsed = await chain.invoke({
+    const messages = await prompt.formatMessages({
       targetType: target_type,
       vl: recognition_context.vl_ocr_result || '',
       guji: recognition_context.guji_ocr_result || '',
       danzi: recognition_context.danzi_ocr_result || '',
     })
+    const response = await llm.invoke(messages)
+    const raw = typeof response.content === 'string' ? response.content.trim() : String(response.content || '').trim()
 
-    const result = {
-      display: parsed?.display || { ocr_result: '', image_type: target_type, data: {} },
+    const match = raw.match(/\{[\s\S]*\}/m)
+    if (!match) {
+      throw new Error(`无法解析模型输出: ${raw.slice(0, 200)}`)
     }
 
-    logger.info(MODULE, `输出类型: ${result.display.image_type || '(未知)'}`)
+    const parsed = JSON.parse(match[0])
+    const display = parsed?.display || { ocr_result: '', image_type: target_type, data: {} }
+
+    logger.info(MODULE, `输出类型: ${display.image_type || '(未知)'}`)
     logger.section(MODULE, `请求完成, 总耗时: ${Date.now() - startTime}ms`)
 
     return {
       code: 200,
       message: 'success',
-      result,
+      result: { display },
     }
   } catch (error: any) {
     logger.error(MODULE, error.message || '未知错误')

@@ -1,15 +1,10 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts'
-import { z } from 'zod'
 import { getLLM } from '../utils/llm'
 import { logger } from '../utils/logger'
 
 const DEFAULT_MAX_QUESTIONS = 3
 const MIN_QUESTIONS = 1
 const MAX_QUESTIONS = 5
-
-const followUpQuestionsSchema = z.object({
-  follow_up_questions: z.array(z.string().min(1)),
-})
 
 function clampMaxQuestions(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) return DEFAULT_MAX_QUESTIONS
@@ -85,18 +80,28 @@ export default defineEventHandler(async (event) => {
       '4. 不要输出与历史对话中已回答过的问题重复的内容。',
       '5. 输出问题数量必须恰好为 {targetCount} 条，不要输出编号。',
       '',
+      '## 重要：请严格按以下 JSON 格式输出，不要输出任何解释文字',
+      '{{"follow_up_questions": ["问题1", "问题2", "问题3"]}}',
+      '',
       '当前用户问题：{query}',
       '历史对话记录：',
       '{history}',
     ].join('\n'))
 
-    const chain = prompt.pipe(llm.withStructuredOutput(followUpQuestionsSchema))
-    const parsed = await chain.invoke({
+    const messages = await prompt.formatMessages({
       targetCount,
       query: query.trim(),
       history: formatConversationHistory(history),
     })
+    const response = await llm.invoke(messages)
+    const raw = typeof response.content === 'string' ? response.content.trim() : String(response.content || '').trim()
 
+    const match = raw.match(/\{[\s\S]*\}/m)
+    if (!match) {
+      throw new Error(`无法解析模型输出: ${raw.slice(0, 200)}`)
+    }
+
+    const parsed = JSON.parse(match[0])
     const uniqueQuestions = Array.from(
       new Set(
         (Array.isArray(parsed?.follow_up_questions) ? parsed.follow_up_questions : [])
