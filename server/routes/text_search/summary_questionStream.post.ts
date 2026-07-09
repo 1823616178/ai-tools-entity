@@ -1,5 +1,5 @@
 import { logger } from '../../utils/logger'
-import { buildQaOutputFormat, isDeepseekMode } from '../../utils/qaOutputFormat'
+import { buildQaOutputFormat } from '../../utils/qaOutputFormat'
 import { createQaSseStream, startSseResponse } from '../../utils/qaStream'
 
 type UnknownRecord = Record<string, unknown>
@@ -76,7 +76,7 @@ export default defineEventHandler(async (event) => {
   logger.section(MODULE, '收到请求')
 
   const body = await readBody(event)
-  const { session_id, summary, fourFold, title, author, threshold, topN, mode, history } = body || {}
+  const { session_id, summary, fourFold, title, author, threshold, topN, history } = body || {}
 
   const sessionId = typeof session_id === 'string' && session_id ? session_id : String(Date.now())
   const summaryText = textValue(summary)
@@ -92,7 +92,7 @@ export default defineEventHandler(async (event) => {
     return `event: error\ndata: ${JSON.stringify({ message: '参数错误：summary 不能为空' })}\n\n`
   }
 
-  logger.info(MODULE, `session=${sessionId} mode=${mode || '-'} threshold=${thresholdVal} topN=${topNVal}`)
+  logger.info(MODULE, `session=${sessionId} threshold=${thresholdVal} topN=${topNVal}`)
 
   const score = Number(Math.max(thresholdVal, 0.83).toFixed(2))
   const queryResultValue = [
@@ -115,22 +115,14 @@ export default defineEventHandler(async (event) => {
   if (fourFoldText) filterLines.push(`四部分类：${fourFoldText}`)
   if (titleText) filterLines.push(`书名：${titleText}`)
   if (authorText) filterLines.push(`作者：${authorText}`)
-  const enableThink = isDeepseekMode(mode)
 
-  const systemPrompt = enableThink
-    ? [
-        '你是一位古汉语与古籍文献领域的智能问答助手。',
-        buildQaOutputFormat(true),
-        '用户会给出一段「摘要/问题主体」以及可选过滤条件，请基于这些信息和模拟命中记录回答。',
-        '信息不足时需说明依据不足；可以给出审慎推断，但不要虚构具体馆藏细节。',
-      ].join('\n')
-    : [
-        '你是一位古汉语与古籍文献领域的智能问答助手。',
-        buildQaOutputFormat(false),
-        '用户会给出一段「摘要/问题主体」以及可选过滤条件，请基于这些信息和模拟命中记录回答。',
-        '信息不足时需说明依据不足；可以给出审慎推断，但不要虚构具体馆藏细节。',
-        '使用现代汉语，条理清晰。',
-      ].join('\n')
+  const systemPrompt = [
+    '你是一位古汉语与古籍文献领域的智能问答助手。',
+    buildQaOutputFormat(),
+    '用户会给出一段「摘要/问题主体」以及可选过滤条件，请基于这些信息和模拟命中记录回答。',
+    '信息不足时需说明依据不足；可以给出审慎推断，但不要虚构具体馆藏细节。',
+    '使用现代汉语，条理清晰。',
+  ].join('\n')
 
   const userPromptParts: string[] = []
   if (filterLines.length) userPromptParts.push(`过滤条件：\n${filterLines.join('\n')}`)
@@ -146,7 +138,6 @@ export default defineEventHandler(async (event) => {
     systemPrompt,
     userPrompt,
     preEvents: [queryResultEvent],
-    enableThink,
     module: MODULE,
   })
 })

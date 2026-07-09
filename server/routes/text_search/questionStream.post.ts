@@ -1,5 +1,5 @@
 import { logger } from '../../utils/logger'
-import { buildQaOutputFormat, isDeepseekMode } from '../../utils/qaOutputFormat'
+import { buildQaOutputFormat } from '../../utils/qaOutputFormat'
 import { createQaSseStream, startSseResponse } from '../../utils/qaStream'
 
 type UnknownRecord = Record<string, unknown>
@@ -9,7 +9,7 @@ type UnknownRecord = Record<string, unknown>
  * 对齐文档 POST /text_search/questionStream
  *
  * 请求体 QuestionParam: { session_id?, question, mode?, history?, context? }
- * 响应 text/event-stream: [START] / reason / answer / cite / [DONE]
+ * 响应 text/event-stream: [START] / answer / cite / [DONE]
  * 本实现不接入 Java/Milvus，按文档模拟检索流程和 SSE 出参格式，context 作为召回上下文喂给模型。
  */
 
@@ -144,7 +144,7 @@ export default defineEventHandler(async (event) => {
   logger.section(MODULE, '收到请求')
 
   const body = await readBody(event)
-  const { session_id, question, mode, history, context } = body || {}
+  const { session_id, question, history, context } = body || {}
 
   const sessionId = typeof session_id === 'string' && session_id ? session_id : String(Date.now())
   const questionText = textValue(question)
@@ -155,25 +155,17 @@ export default defineEventHandler(async (event) => {
     return `event: error\ndata: ${JSON.stringify({ message: '参数错误：question 不能为空' })}\n\n`
   }
 
-  logger.info(MODULE, `session=${sessionId} mode=${mode || '-'} question=${shortText(questionText, 50)}`)
+  logger.info(MODULE, `session=${sessionId} question=${shortText(questionText, 50)}`)
 
   const { contextLines, book, chapter } = buildContextLines(context)
   const historyLines = buildHistoryLines(history)
-  const enableThink = isDeepseekMode(mode)
 
-  const systemPrompt = enableThink
-    ? [
-        '你是一位古汉语与古籍文献领域的智能问答助手。',
-        buildQaOutputFormat(true),
-        '优先基于提供的模拟检索上下文回答；上下文不足时说明依据不足，并可给出审慎推断。',
-        '正式回答使用现代汉语，条理清晰；涉及书名、作者、馆藏等信息时保持原文名称。',
-      ].join('\n')
-    : [
-        '你是一位古汉语与古籍文献领域的智能问答助手。',
-        buildQaOutputFormat(false),
-        '优先基于提供的模拟检索上下文回答；上下文不足时说明依据不足，并可给出审慎推断。',
-        '使用现代汉语，条理清晰；涉及书名、作者、馆藏等信息时保持原文名称。',
-      ].join('\n')
+  const systemPrompt = [
+    '你是一位古汉语与古籍文献领域的智能问答助手。',
+    buildQaOutputFormat(),
+    '优先基于提供的模拟检索上下文回答；上下文不足时说明依据不足，并可给出审慎推断。',
+    '正式回答使用现代汉语，条理清晰；涉及书名、作者、馆藏等信息时保持原文名称。',
+  ].join('\n')
 
   const userPromptParts: string[] = []
   if (contextLines.length) userPromptParts.push(`检索到的上下文：\n${contextLines.join('\n\n')}`)
@@ -190,7 +182,6 @@ export default defineEventHandler(async (event) => {
     systemPrompt,
     userPrompt,
     cites,
-    enableThink,
     module: MODULE,
   })
 })
