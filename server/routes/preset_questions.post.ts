@@ -45,7 +45,7 @@ function extractJsonFromText(text: string): unknown {
   }
 
   const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (codeBlockMatch) {
+  if (codeBlockMatch?.[1]) {
     try {
       return JSON.parse(codeBlockMatch[1].trim())
     } catch {
@@ -54,7 +54,7 @@ function extractJsonFromText(text: string): unknown {
   }
 
   const jsonMatch = text.match(/(\{[\s\S]*\})/)
-  if (jsonMatch) {
+  if (jsonMatch?.[1]) {
     try {
       return JSON.parse(jsonMatch[1].trim())
     } catch {

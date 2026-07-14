@@ -35,6 +35,11 @@
                 <span class="feature-name">外部 NER</span>
                 <span class="feature-desc">实体标引工具</span>
             </NuxtLink>
+            <NuxtLink to="/document-questions" class="feature-card">
+                <span class="feature-icon">💡</span>
+                <span class="feature-name">文件问题推荐</span>
+                <span class="feature-desc">按文件生成推荐问题</span>
+            </NuxtLink>
         </section>
 
         <nav class="tab-nav">

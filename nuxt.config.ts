@@ -28,9 +28,13 @@ export default defineNuxtConfig({
       baseUrl: 'https://api.deepseek.com/v1/chat/completions',
       apiKey: 'sk-0c5773fdc60d46b7afd79caa6cb2ce97',
       model: 'deepseek-v4-flash',
+      maxInputTokens: 8000,
     },
     paddleOcr: {
       apiUrl: 'http://192.168.1.45:8000/ocr',
+    },
+    documentRecommendedQuestions: {
+      questionCount: 3,
     },
     logDir: './logs',
   },

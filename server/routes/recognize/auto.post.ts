@@ -79,7 +79,7 @@ interface ClassifiedResult {
  */
 function classifyAncientText(text: string, lines: string[]): ClassifiedResult {
   // 1. 单字：只有一行且只有一个字符
-  if (lines.length === 1 && lines[0].length === 1) {
+  if (lines.length === 1 && lines[0]?.length === 1) {
     return {
       image_type: 'single_char',
       data: {},
@@ -158,9 +158,9 @@ function parseCouplet(text: string): ClassifiedResult {
 
   // 兜底：如果只有两行且无标签，第一行为上联，第二行为下联
   if (!first_line && !second_line && lines.length >= 2) {
-    first_line = lines[0]
-    second_line = lines[1]
-    if (lines.length >= 3) top_scroll = lines[2]
+    first_line = lines[0] ?? ''
+    second_line = lines[1] ?? ''
+    if (lines.length >= 3) top_scroll = lines[2] ?? ''
   }
 
   return {
@@ -178,8 +178,8 @@ function parsePoem(lines: string[]): ClassifiedResult {
   let signature = ''
 
   if (lines.length >= 3) {
-    title = lines[0]
-    author = lines[1]
+    title = lines[0] ?? ''
+    author = lines[1] ?? ''
     content = lines.slice(2).join('\n')
   }
   else {
