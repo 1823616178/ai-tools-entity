@@ -54,7 +54,7 @@ pip install -r requirements.txt
 USE_VENV=true ./start-ocr.sh start
 ```
 
-服务启动后访问：http://localhost:8000/docs
+服务启动后访问：http://localhost:58700/docs
 
 ## systemd 托管（生产环境推荐）
 
@@ -105,7 +105,7 @@ sudo systemctl start rapidocr
 cd server_ocr
 docker build -t rapidocr-openvino-service .
 docker run -d \
-  -p 8000:8000 \
+  -p 58700:58700 \
   -e OCR_MAX_CONCURRENT=4 \
   -e OCR_WORKERS=1 \
   --name rapidocr-openvino \
@@ -119,7 +119,7 @@ docker run -d \
 ```bash
 docker run -d \
   --device /dev/dri \
-  -p 8000:8000 \
+  -p 58700:58700 \
   -e OCR_PROVIDERS="OpenVINOExecutionProvider,CPUExecutionProvider" \
   -e OCR_MAX_CONCURRENT=2 \
   --name rapidocr-openvino \
@@ -259,7 +259,7 @@ Office 文档会先用 LibreOffice 转成 PDF，再逐页识别。
 OCR 服务默认在容器/主机外部独立运行，Nuxt 后端通过环境变量 `NUXT_PADDLE_OCR_URL`（或旧名 `PADDLE_OCR_URL`）调用：
 
 ```
-http://localhost:8000/ocr
+http://localhost:58700/ocr
 ```
 
 > 服务内部已改为 RapidOCR + OpenVINO，但 API 路径保持不变，Nuxt 后端无需修改。
@@ -267,7 +267,7 @@ http://localhost:8000/ocr
 在 `.env` 中配置：
 
 ```env
-NUXT_PADDLE_OCR_URL=http://localhost:8000/ocr
+NUXT_PADDLE_OCR_URL=http://localhost:58700/ocr
 ```
 
 详细集成方式见根目录 `.env.example`。

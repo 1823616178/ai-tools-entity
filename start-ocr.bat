@@ -16,6 +16,7 @@ set PYTHON_CMD=python
 set PID_FILE=.ocr.pid
 set LOG_DIR=logs
 set USE_VENV=%USE_VENV:false%
+set OCR_PORT=%OCR_PORT:58700%
 
 set COMMAND=%~1
 if "%COMMAND%"=="" set COMMAND=start
@@ -119,11 +120,13 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
 echo [start-ocr] 正在后台启动 RapidOCR + OpenVINO 服务...
 echo [start-ocr] OCR_PROVIDERS=%OCR_PROVIDERS%
+echo [start-ocr] OCR_PORT=%OCR_PORT%
+set OCR_PORT=%OCR_PORT%
 start /B %PYTHON_CMD% main.py > "%LOG_DIR%\ocr.log" 2>&1
 
 echo [start-ocr] 服务已后台启动
-echo [start-ocr] 健康检查地址: http://localhost:8000/health
-echo [start-ocr] API 地址: http://localhost:8000/ocr
+echo [start-ocr] 健康检查地址: http://localhost:%OCR_PORT%/health
+echo [start-ocr] API 地址: http://localhost:%OCR_PORT%/ocr
 echo [start-ocr] 日志文件: server_ocr/logs/ocr.log
 echo [start-ocr] 停止命令: %~nx0 stop
 

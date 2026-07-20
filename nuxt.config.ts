@@ -34,7 +34,7 @@ export default defineNuxtConfig({
       maxInputTokens: 8000,
     },
     paddleOcr: {
-      apiUrl: 'http://192.168.1.45:8000/ocr',
+      apiUrl: 'http://192.168.1.45:58700/ocr',
     },
     documentRecommendedQuestions: {
       questionCount: 3,

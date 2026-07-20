@@ -16,6 +16,7 @@ PYTHON_CMD="${PYTHON_CMD:-python3}"
 PID_FILE="${PID_FILE:-$SCRIPT_DIR/server_ocr/.ocr.pid}"
 LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/server_ocr/logs}"
 USE_VENV="${USE_VENV:-false}"
+OCR_PORT="${OCR_PORT:-58700}"
 
 # 解析命令
 COMMAND="${1:-start}"
@@ -141,12 +142,13 @@ mkdir -p "$LOG_DIR"
 
 echo "[start-ocr] 正在后台启动 RapidOCR + OpenVINO 服务..."
 echo "[start-ocr] OCR_PROVIDERS=$OCR_PROVIDERS"
-nohup "$PYTHON_CMD" main.py > "$LOG_DIR/ocr.log" 2>&1 &
+echo "[start-ocr] OCR_PORT=$OCR_PORT"
+OCR_PORT="$OCR_PORT" nohup "$PYTHON_CMD" main.py > "$LOG_DIR/ocr.log" 2>&1 &
 pid=$!
 echo "$pid" > "$PID_FILE"
 
 echo "[start-ocr] 服务已后台启动 (PID: $pid)"
-echo "[start-ocr] 健康检查地址: http://localhost:8000/health"
-echo "[start-ocr] API 地址: http://localhost:8000/ocr"
+echo "[start-ocr] 健康检查地址: http://localhost:$OCR_PORT/health"
+echo "[start-ocr] API 地址: http://localhost:$OCR_PORT/ocr"
 echo "[start-ocr] 日志文件: server_ocr/logs/ocr.log"
 echo "[start-ocr] 停止命令: $0 stop"

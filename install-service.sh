@@ -53,7 +53,7 @@ Group=$RUN_USER
 WorkingDirectory=$PROJECT_DIR/server_ocr
 Environment=OCR_PROVIDERS=OpenVINOExecutionProvider,CPUExecutionProvider
 Environment=OCR_HOST=0.0.0.0
-Environment=OCR_PORT=8000
+Environment=OCR_PORT=58700
 Environment=OCR_WORKERS=1
 Environment=OCR_MAX_CONCURRENT=4
 Environment=OCR_THREAD_WORKERS=4

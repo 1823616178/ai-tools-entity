@@ -35,15 +35,15 @@ RUN python -c "from rapidocr import RapidOCR; RapidOCR()" || true
 RUN useradd -m -u 1001 ocr && chown -R ocr:ocr /app
 USER ocr
 
-EXPOSE 8000
+EXPOSE 58700
 
 ENV OCR_HOST=0.0.0.0
-ENV OCR_PORT=8000
+ENV OCR_PORT=58700
 ENV OCR_PROVIDERS="OpenVINOExecutionProvider,CPUExecutionProvider"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRYTECODE=1
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -fsS http://localhost:8000/health || exit 1
+    CMD curl -fsS http://localhost:58700/health || exit 1
 
 CMD ["python", "main.py"]

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 @dataclass
 class Settings:
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 58700
     workers: int = 1
     max_concurrent: int = 4
     thread_workers: int = 4
@@ -73,7 +73,7 @@ def _env_str(key: str, default: str) -> str:
 def load_settings() -> Settings:
     return Settings(
         host=_env_str("OCR_HOST", "0.0.0.0"),
-        port=_env_int("OCR_PORT", 8000),
+        port=_env_int("OCR_PORT", 58700),
         workers=_env_int("OCR_WORKERS", 1),
         max_concurrent=_env_int("OCR_MAX_CONCURRENT", 4),
         thread_workers=_env_int("OCR_THREAD_WORKERS", 4),
