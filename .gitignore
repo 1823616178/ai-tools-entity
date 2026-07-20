@@ -24,3 +24,11 @@ logs
 # Log files
 /logs/
 .env.example
+
+# OCR downloaded models
+/server_ocr/models/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class

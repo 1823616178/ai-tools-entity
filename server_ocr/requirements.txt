@@ -1,7 +1,7 @@
-# PaddleOCR 服务依赖
-# 默认 CPU 版本；GPU 版本请把 paddlepaddle 替换为 paddlepaddle-gpu
-paddlepaddle==2.6.2
-paddleocr==2.8.1
+# OpenVINO + RapidOCR 服务依赖
+# RapidOCR 基于 PaddleOCR 模型结构，支持 onnxruntime / openvino 后端
+rapidocr>=3.9.0
+onnxruntime-openvino>=1.18.0
 
 # Web 框架
 fastapi==0.115.6

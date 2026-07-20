@@ -1,5 +1,5 @@
 """
-PaddleOCR HTTP 服务入口
+RapidOCR + OpenVINO HTTP 服务入口
 - 并发控制：asyncio.Semaphore + ThreadPoolExecutor
 - 进程扩展：通过 Uvicorn workers 横向扩展
 - 输入支持：base64 / URL
@@ -42,7 +42,8 @@ async def lifespan(app: FastAPI):
     logger.info(
         f"OCR 服务已启动 | host={settings.host}, port={settings.port}, "
         f"workers={settings.workers}, max_concurrent={settings.max_concurrent}, "
-        f"thread_workers={settings.thread_workers}, timeout={settings.request_timeout}s"
+        f"thread_workers={settings.thread_workers}, timeout={settings.request_timeout}s, "
+        f"providers={settings.ocr_providers}"
     )
     logger.info(f"日志级别: {settings.log_level}, 日志目录: {settings.log_dir}")
     yield
@@ -52,8 +53,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PaddleOCR Service",
-    description="支持并发请求的 PaddleOCR HTTP 服务",
+    title="RapidOCR OpenVINO Service",
+    description="支持并发请求的 RapidOCR + OpenVINO HTTP 服务",
     version="1.0.0",
     lifespan=lifespan,
 )

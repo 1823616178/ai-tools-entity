@@ -1,5 +1,6 @@
 """
-PaddleOCR 引擎封装：支持并发控制、线程池、模型预热
+OCR 引擎封装：基于 RapidOCR + ONNX Runtime（支持 OpenVINO Execution Provider）
+提供并发控制、线程池、模型预热能力。
 """
 
 import asyncio
@@ -12,56 +13,19 @@ from typing import List, Optional
 import cv2
 import numpy as np
 from config import Settings
-
-
-# Paddle 2.6.2 官方 wheel 在部分 AMD Zen+ 等 CPU 上会在 IR 优化阶段触发
-# `SelfAttentionFusePass` 的非法指令（SIGILL）崩溃。强制关闭 IR 优化可绕过该问题，
-# 对 PaddleOCR 推理模型影响很小。
-def _patch_paddle_disable_ir_optim() -> None:
-    try:
-        import paddle.inference as inference
-
-        _orig_switch_ir_optim = inference.Config.switch_ir_optim
-
-        def _switch_ir_optim(self, flag: bool) -> None:
-            _orig_switch_ir_optim(self, False)
-
-        inference.Config.switch_ir_optim = _switch_ir_optim
-    except Exception as exc:
-        logging.getLogger(__name__).warning(f"关闭 Paddle IR 优化补丁失败: {exc}")
-
-
-_patch_paddle_disable_ir_optim()
-
-from paddleocr import PaddleOCR
+from rapidocr import EngineType, RapidOCR
 from schemas import Box, OCRFileResult, OCRPageResult, OCRResult, Point, TextLine
 from utils import office_to_pdf, pdf_to_images
 
 logger = logging.getLogger(__name__)
 
 
-def _set_intel_gpu_device() -> None:
-    """设置 Paddle 使用 intel_gpu 自定义设备"""
-    try:
-        import paddle
-
-        device_types = paddle.device.get_all_custom_device_type()
-        logger.info(f"可用的 custom device 类型: {device_types}")
-        if "intel_gpu" not in device_types:
-            logger.warning("未检测到 intel_gpu 自定义设备，将回退到 CPU")
-            return
-        paddle.set_device("intel_gpu")
-        logger.info("已设置 paddle device 为 intel_gpu")
-    except Exception as exc:
-        logger.warning(f"设置 intel_gpu 设备失败: {exc}")
-
-
 class OCREngine:
     """
     并发安全设计：
-    1. 启动时加载一次 PaddleOCR 模型，常驻内存
-    2. asyncio.Semaphore 限制同时进入推理的请求数，防止 OOM/CPU 挤占
-    3. ThreadPoolExecutor 把同步的 ocr.ocr() 调用包装为异步，避免阻塞事件循环
+    1. 启动时加载一次 RapidOCR 模型，常驻内存
+    2. asyncio.Semaphore 限制同时进入推理的请求数
+    3. ThreadPoolExecutor 把同步的 engine() 调用包装为异步，避免阻塞事件循环
     4. 支持多 worker 进程横向扩展（每个 worker 独立一份模型）
     """
 
@@ -72,50 +36,33 @@ class OCREngine:
             max_workers=settings.thread_workers,
             thread_name_prefix="ocr_worker",
         )
-        self._ocr: Optional[PaddleOCR] = None
+        self._ocr: Optional[RapidOCR] = None
 
     def load(self) -> None:
         """同步加载模型，应在 startup 中调用一次"""
         logger.info("=" * 50)
-        logger.info("正在加载 PaddleOCR 模型...")
-        logger.info(
-            f"配置: use_angle_cls={self.settings.ocr_use_angle_cls}, "
-            f"lang={self.settings.ocr_lang}, use_gpu={self.settings.ocr_use_gpu}, "
-            f"use_xpu={self.settings.ocr_use_xpu}, model_dir={self.settings.model_dir}"
-        )
+        logger.info("正在加载 RapidOCR 模型...")
 
-        # XPU 环境变量配置（当前默认适配 Intel Arc GPU / Intel XPU）
-        use_gpu = self.settings.ocr_use_gpu
-        if self.settings.ocr_use_xpu:
-            logger.info("启用 XPU (Intel GPU) 加速")
-            # Intel oneAPI / Level Zero 常用环境变量
-            os.environ.setdefault("SYCL_DEVICE_FILTER", "level_zero:gpu")
-            os.environ.setdefault("ONEAPI_DEVICE_SELECTOR", "level_zero:gpu")
-            # 如有多卡，可通过 ZE_AFFINITY_MASK 指定卡号，例如 "0"
-            # os.environ.setdefault("ZE_AFFINITY_MASK", "0")
-
-            # 设置 paddle 使用 intel_gpu 自定义设备
-            _set_intel_gpu_device()
-
-            # Intel GPU 模式下通常仍需要 use_gpu=True 让框架走异构后端
-            if not use_gpu:
-                logger.info("XPU 模式下自动设置 use_gpu=True")
-                use_gpu = True
+        providers = self._parse_providers(self.settings.ocr_providers)
+        logger.info(f"ONNX Runtime providers: {providers}")
 
         start = time.time()
 
+        # 模型目录不存在时自动创建，RapidOCR 会自动下载 ONNX 模型到该目录
         os.makedirs(self.settings.model_dir, exist_ok=True)
 
-        self._ocr = PaddleOCR(
-            use_angle_cls=self.settings.ocr_use_angle_cls,
-            lang=self.settings.ocr_lang,
-            use_gpu=use_gpu,
-            det_model_dir=os.path.join(self.settings.model_dir, "det"),
-            rec_model_dir=os.path.join(self.settings.model_dir, "rec"),
-            cls_model_dir=os.path.join(self.settings.model_dir, "cls"),
-            show_log=False,
+        self._ocr = RapidOCR(
+            params={
+                "Det.engine_type": EngineType.ONNXRUNTIME,
+                "Cls.engine_type": EngineType.ONNXRUNTIME,
+                "Rec.engine_type": EngineType.ONNXRUNTIME,
+                "EngineConfig.onnxruntime.providers": providers,
+                "Global.model_root_dir": self.settings.model_dir,
+                "Global.use_cls": self.settings.ocr_use_angle_cls,
+            }
         )
-        logger.info(f"PaddleOCR 模型加载完成，耗时 {time.time() - start:.2f}s")
+
+        logger.info(f"RapidOCR 模型加载完成，耗时 {time.time() - start:.2f}s")
         logger.info("=" * 50)
 
     def warmup(self) -> None:
@@ -124,9 +71,9 @@ class OCREngine:
         if not self.settings.enable_warmup or ocr is None:
             return
         logger.info("模型预热中...")
-        dummy = np.zeros((100, 100, 3), dtype=np.uint8)
+        dummy = np.ones((100, 100, 3), dtype=np.uint8) * 255
         try:
-            ocr.ocr(dummy, cls=self.settings.ocr_use_angle_cls)
+            ocr(dummy)
             logger.info("模型预热完成")
         except Exception as exc:
             logger.warning(f"模型预热失败（不影响服务）: {exc}")
@@ -136,9 +83,7 @@ class OCREngine:
         img: np.ndarray,
         return_lines: bool = True,
     ) -> OCRResult:
-        """
-        异步识别接口
-        """
+        """异步识别接口"""
         if self._ocr is None:
             raise RuntimeError("OCR 引擎尚未加载")
 
@@ -161,17 +106,15 @@ class OCREngine:
             )
             return result
 
-    def _sync_ocr(self, img: np.ndarray):
-        """同步调用 PaddleOCR"""
+    def _sync_ocr(self, img):
+        """同步调用 RapidOCR"""
         ocr = self._ocr
         if ocr is None:
             raise RuntimeError("OCR 引擎尚未加载")
-        # 浅拷贝避免多线程下对同一张图的并发修改问题
-        img_copy = img.copy()
-        return ocr.ocr(
-            img_copy,
-            cls=self.settings.ocr_use_angle_cls,
-        )
+        # numpy 数组做浅拷贝，避免多线程下对同一张图的并发修改问题
+        # 字符串/URL/Path 等不可变输入直接传递
+        input_data = img.copy() if isinstance(img, np.ndarray) else img
+        return ocr(input_data)
 
     def _format_result(
         self,
@@ -183,18 +126,16 @@ class OCREngine:
         lines: List[TextLine] = []
         full_text_parts: List[str] = []
 
-        # PaddleOCR 返回 [[det_result]] 或 None
-        if raw_result is None or len(raw_result) == 0:
+        if raw_result is None or raw_result.boxes is None:
             return OCRResult(text="", lines=[], image_width=width, image_height=height)
 
-        page_result = raw_result[0]
-        if page_result is None:
-            return OCRResult(text="", lines=[], image_width=width, image_height=height)
+        boxes = raw_result.boxes
+        txts = raw_result.txts or ()
+        scores = raw_result.scores or ()
 
-        for item in page_result:
-            if item is None:
-                continue
-            box_coords, (text, score) = item
+        for idx, box in enumerate(boxes):
+            text = txts[idx] if idx < len(txts) else ""
+            score = float(scores[idx]) if idx < len(scores) else 0.0
             if text is None:
                 continue
             full_text_parts.append(text)
@@ -202,8 +143,8 @@ class OCREngine:
                 lines.append(
                     TextLine(
                         text=text,
-                        confidence=float(score),
-                        box=self._box_from_coords(box_coords),
+                        confidence=score,
+                        box=self._box_from_coords(box),
                     )
                 )
 
@@ -216,14 +157,23 @@ class OCREngine:
 
     @staticmethod
     def _box_from_coords(coords) -> Box:
-        if len(coords) < 4:
-            coords = list(coords) + [[0.0, 0.0]] * (4 - len(coords))
+        coords = np.asarray(coords, dtype=float)
+        if coords.shape[0] < 4:
+            padding = np.zeros((4 - coords.shape[0], 2), dtype=float)
+            coords = np.vstack([coords, padding])
         return Box(
             top_left=Point(x=float(coords[0][0]), y=float(coords[0][1])),
             top_right=Point(x=float(coords[1][0]), y=float(coords[1][1])),
             bottom_right=Point(x=float(coords[2][0]), y=float(coords[2][1])),
             bottom_left=Point(x=float(coords[3][0]), y=float(coords[3][1])),
         )
+
+    @staticmethod
+    def _parse_providers(providers_str: str) -> List[str]:
+        """把逗号分隔的 provider 字符串解析为列表"""
+        if not providers_str:
+            return ["CPUExecutionProvider"]
+        return [p.strip() for p in providers_str.split(",") if p.strip()]
 
     async def recognize_file(
         self,

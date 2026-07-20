@@ -14,11 +14,21 @@ class Settings:
     workers: int = 1
     max_concurrent: int = 4
     thread_workers: int = 4
+
+    # OCR 推理后端配置（基于 RapidOCR + onnxruntime-openvino）
+    # 可用的 provider 示例：
+    #   OpenVINOExecutionProvider  （Intel GPU / CPU，推荐 A770 使用）
+    #   CUDAExecutionProvider      （NVIDIA GPU）
+    #   CPUExecutionProvider       （纯 CPU 回退）
+    # 多个 provider 用逗号分隔，按优先级从左到右尝试
+    ocr_providers: str = "OpenVINOExecutionProvider,CPUExecutionProvider"
+
+    # 是否使用方向分类器（RapidOCR 默认启用）
     ocr_use_angle_cls: bool = True
-    ocr_lang: str = "ch"
-    ocr_use_gpu: bool = False
-    ocr_use_xpu: bool = False  # Intel Arc GPU / Intel XPU 加速开关
+
+    # 模型下载/缓存目录（RapidOCR 会自动下载 ONNX 模型）
     model_dir: str = "./models"
+
     log_level: str = "INFO"
     log_dir: str = "./logs"
     log_file: str = "ocr.log"
@@ -56,23 +66,28 @@ def _env_float(key: str, default: float) -> float:
         return default
 
 
+def _env_str(key: str, default: str) -> str:
+    return os.getenv(key, default)
+
+
 def load_settings() -> Settings:
     return Settings(
-        host=os.getenv("OCR_HOST", "0.0.0.0"),
+        host=_env_str("OCR_HOST", "0.0.0.0"),
         port=_env_int("OCR_PORT", 8000),
         workers=_env_int("OCR_WORKERS", 1),
         max_concurrent=_env_int("OCR_MAX_CONCURRENT", 4),
         thread_workers=_env_int("OCR_THREAD_WORKERS", 4),
+        ocr_providers=_env_str(
+            "OCR_PROVIDERS",
+            "OpenVINOExecutionProvider,CPUExecutionProvider",
+        ),
         ocr_use_angle_cls=_env_bool("OCR_USE_ANGLE_CLS", True),
-        ocr_lang=os.getenv("OCR_LANG", "ch"),
-        ocr_use_gpu=_env_bool("OCR_USE_GPU", False),
-        ocr_use_xpu=_env_bool("OCR_USE_XPU", False),
-        model_dir=os.getenv("OCR_MODEL_DIR", "./models"),
-        log_level=os.getenv("OCR_LOG_LEVEL", "INFO"),
-        log_dir=os.getenv("OCR_LOG_DIR", "./logs"),
-        log_file=os.getenv("OCR_LOG_FILE", "ocr.log"),
+        model_dir=_env_str("OCR_MODEL_DIR", "./models"),
+        log_level=_env_str("OCR_LOG_LEVEL", "INFO"),
+        log_dir=_env_str("OCR_LOG_DIR", "./logs"),
+        log_file=_env_str("OCR_LOG_FILE", "ocr.log"),
         log_backup_days=_env_int("OCR_LOG_BACKUP_DAYS", 30),
-        log_format=os.getenv(
+        log_format=_env_str(
             "OCR_LOG_FORMAT",
             "%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s",
         ),

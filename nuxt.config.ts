@@ -22,7 +22,10 @@ export default defineNuxtConfig({
       db: 0,
     },
     ner: {
-      apiUrl: 'http://192.168.1.45:54104/predict',
+      apiUrl: 'http://192.168.1.45:8008/ner',
+    },
+    punctuation: {
+      apiUrl: 'http://192.168.1.45:8009/predict',
     },
     llm: {
       baseUrl: 'https://api.deepseek.com/v1/chat/completions',

@@ -1,6 +1,6 @@
-# PaddleOCR 服务
+# RapidOCR + OpenVINO 服务
 
-为 `aiTool` 项目提供独立的 OCR 识别能力，支持高并发请求。
+为 `aiTool` 项目提供独立的 OCR 识别能力，基于 [RapidOCR](https://github.com/RapidAI/RapidOCR) 与 ONNX Runtime，支持 OpenVINO Execution Provider 以在 Intel CPU/GPU 上加速推理。
 
 ## 目录结构
 
@@ -16,7 +16,30 @@ server_ocr/
 └── README.md
 ```
 
-## 本地开发
+## 本地开发（推荐）
+
+项目根目录已提供启动脚本，会自动创建虚拟环境、安装依赖并启动服务。
+
+### Linux / macOS
+
+```bash
+cd aiTool
+./start-ocr.sh              # 前台运行
+./start-ocr.sh --daemon     # 后台运行
+./start-ocr.sh --stop       # 停止后台进程
+./start-ocr.sh --status     # 查看后台进程状态
+```
+
+### Windows
+
+```cmd
+cd aiTool
+start-ocr.bat               # 前台运行
+start-ocr.bat --daemon      # 后台运行（新窗口）
+start-ocr.bat --stop        # 停止后台进程
+```
+
+### 手动启动
 
 ```bash
 cd server_ocr
@@ -28,18 +51,48 @@ python main.py
 
 服务启动后访问：http://localhost:8000/docs
 
-## Docker 运行
+## Docker 运行（可选）
+
+如果希望通过 Docker 运行：
 
 ```bash
 cd server_ocr
-docker build -t paddle-ocr-service .
+docker build -t rapidocr-openvino-service .
 docker run -d \
   -p 8000:8000 \
   -e OCR_MAX_CONCURRENT=4 \
   -e OCR_WORKERS=1 \
-  --name paddle-ocr \
-  paddle-ocr-service
+  --name rapidocr-openvino \
+  rapidocr-openvino-service
 ```
+
+### Intel GPU 加速（A770 / iGPU / Arc）
+
+启动容器时映射 GPU 设备，并指定 OpenVINO provider：
+
+```bash
+docker run -d \
+  --device /dev/dri \
+  -p 8000:8000 \
+  -e OCR_PROVIDERS="OpenVINOExecutionProvider,CPUExecutionProvider" \
+  -e OCR_MAX_CONCURRENT=2 \
+  --name rapidocr-openvino \
+  rapidocr-openvino-service
+```
+
+> 宿主机必须已安装 Intel GPU 驱动（i915 / xe）。
+
+## 推理后端配置
+
+通过环境变量 `OCR_PROVIDERS` 控制 ONNX Runtime 使用的 Execution Provider：
+
+| 硬件 | 推荐配置 |
+|---|---|
+| Intel CPU / iGPU / Arc A770 | `OpenVINOExecutionProvider,CPUExecutionProvider` |
+| NVIDIA GPU | `CUDAExecutionProvider,CPUExecutionProvider` |
+| 纯 CPU | `CPUExecutionProvider` |
+
+多个 provider 按从左到右优先级依次尝试。
 
 ## API 接口
 
@@ -135,13 +188,14 @@ Office 文档会先用 LibreOffice 转成 PDF，再逐页识别。
 | `OCR_LOG_FILE` | 日志文件名 | `ocr.log` |
 | `OCR_LOG_BACKUP_DAYS` | 保留日志天数 | `30` |
 | `OCR_LOG_REQUEST_BODY` | 是否记录请求体（含图片数据，谨慎开启） | `false` |
+| `OCR_PROVIDERS` | ONNX Runtime Execution Provider 列表 | `OpenVINOExecutionProvider,CPUExecutionProvider` |
 
 ## 并发模型
 
 本服务采用三层并发控制：
 
 1. **Semaphore 限流**：`OCR_MAX_CONCURRENT` 控制同时进入推理的请求数，防止 CPU/GPU 被挤占或 OOM。
-2. **线程池**：`OCR_THREAD_WORKERS` 控制执行同步 PaddleOCR 推理的线程数，避免阻塞事件循环。
+2. **线程池**：`OCR_THREAD_WORKERS` 控制执行同步 RapidOCR 推理的线程数，避免阻塞事件循环。
 3. **多 Worker 进程**：`OCR_WORKERS` 控制 Uvicorn 工作进程数，每个进程独立加载一份模型，适合多核 CPU。
 
 ### 推荐配置
@@ -150,16 +204,24 @@ Office 文档会先用 LibreOffice 转成 PDF，再逐页识别。
 |---|---|---|---|
 | 4 核 CPU 开发机 | 1 | 4 | 4 |
 | 8 核 CPU 生产机 | 2 | 4~6 | 4 |
-| GPU 单卡 | 1 | 2~4 | 2~4 |
+| Intel GPU 单卡 | 1 | 2~4 | 2~4 |
 
-> 注意：每增加一个 worker，内存会多一份模型占用（约 500MB~1GB）。
+> 注意：每增加一个 worker，内存会多一份模型占用（约 200MB~500MB）。
 
 ## 与主项目集成
 
-在 `docker-compose.yml` 中已加入 `paddle-ocr` 服务，Nuxt 后端通过环境变量 `PADDLE_OCR_URL` 调用：
+OCR 服务默认在容器/主机外部独立运行，Nuxt 后端通过环境变量 `NUXT_PADDLE_OCR_URL`（或旧名 `PADDLE_OCR_URL`）调用：
 
 ```
-http://paddle-ocr:8000/ocr
+http://localhost:8000/ocr
 ```
 
-详细集成方式见根目录 `docker-compose.yml` 和 `.env.example`。
+> 服务内部已改为 RapidOCR + OpenVINO，但 API 路径保持不变，Nuxt 后端无需修改。
+
+在 `.env` 中配置：
+
+```env
+NUXT_PADDLE_OCR_URL=http://localhost:8000/ocr
+```
+
+详细集成方式见根目录 `.env.example`。
