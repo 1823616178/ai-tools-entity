@@ -43,8 +43,8 @@ function clampToRange(value: number, min: number, max: number, fallback: number)
 function buildSystemPrompt(answerMaxLength: number): string {
   return [
     '你是文件问答助手。用户上传了一个或多个文件，并提出了一个问题或要求。',
-    '你只能依据所给文件内容作答，不得引入文件之外的知识或凭空编造。',
-    '如果文件内容中没有可以回答该问题的依据，请直接回答："根据已上传文件未找到相关信息。"',
+    '请以文件内容为主要依据来回答，同时可以结合你自己的知识、经验和见解进行补充、分析和延伸，给出有价值的观点。',
+    '当文件内容与你的判断不一致时，请说明并给出你的看法；文件中没有直接依据时，也可以基于常识和推理作答，但需避免凭空编造具体事实。',
     `回答字数请控制在 ${answerMaxLength} 字以内。`,
     buildQaOutputFormat(),
   ].join('\n')

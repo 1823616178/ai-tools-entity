@@ -77,6 +77,10 @@ export default defineEventHandler(async (event) => {
     logger.info(MODULE, `文件正文超出 token 预算（${maxInputTokens}），已按预算截断`)
   }
 
+  // 调试：打印实际拼给模型的用户提示词（长度 + 预览），便于定位“未找到相关信息”问题
+  logger.info(MODULE, `userPrompt 长度: ${userPrompt.length}`)
+  logger.info(MODULE, `userPrompt 预览: ${userPrompt.slice(0, 300)}`)
+
   // 5. 流式输出
   if (useStream) {
     startSseResponse(event)

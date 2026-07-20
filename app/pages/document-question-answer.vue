@@ -264,8 +264,11 @@ function ingestFiles(files: FileList | null) {
 
 async function ingestFile(file: File) {
     // 先占位，展示解析状态
-    const doc = makeDoc(file.name, '', isTextFile(file) ? 'text-file' : 'ocr', 'parsing')
-    documents.value.push(doc)
+    const placeholder = makeDoc(file.name, '', isTextFile(file) ? 'text-file' : 'ocr', 'parsing')
+    documents.value.push(placeholder)
+    // 取回数组中的响应式实例（直接改原始对象不会触发视图更新）
+    const doc = documents.value.find((d) => d.id === placeholder.id)
+    if (!doc) return
 
     try {
         if (isTextFile(file)) {
