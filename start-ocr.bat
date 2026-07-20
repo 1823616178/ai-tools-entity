@@ -2,19 +2,20 @@
 chcp 65001 >nul
 REM 本地管理 RapidOCR + OpenVINO 服务（非 Docker，后台进程模式）
 REM 用法：
-REM   start-ocr.bat start    后台启动
-REM   start-ocr.bat stop     停止
-REM   start-ocr.bat status   查看状态
-REM   start-ocr.bat restart  重启
+REM   start-ocr.bat start        后台启动（使用当前 Python 环境）
+REM   start-ocr.bat stop         停止
+REM   start-ocr.bat status       查看状态
+REM   start-ocr.bat restart      重启
+REM   set USE_VENV=true && start-ocr.bat start   使用 server_ocr\.venv 虚拟环境
 
 setlocal EnableDelayedExpansion
 
 cd /d "%~dp0server_ocr"
 
 set PYTHON_CMD=python
-set VENV_DIR=.venv
 set PID_FILE=.ocr.pid
 set LOG_DIR=logs
+set USE_VENV=%USE_VENV:false%
 
 set COMMAND=%~1
 if "%COMMAND%"=="" set COMMAND=start
@@ -35,7 +36,10 @@ echo   start    后台启动服务
 echo   stop     停止服务
 echo   status   查看服务状态
 echo   restart  重启服务
-echo   --help   显示帮助
+echo.
+echo 环境变量:
+echo   USE_VENV=true     使用 server_ocr\.venv 虚拟环境
+echo   PYTHON_CMD=python 指定 Python 命令
 exit /b 0
 
 :run_stop
@@ -80,17 +84,21 @@ if errorlevel 1 (
     )
 )
 
-REM 创建虚拟环境
-if not exist "%VENV_DIR%\Scripts\activate.bat" (
-    echo [start-ocr] 创建虚拟环境: %VENV_DIR%
-    %PYTHON_CMD% -m venv %VENV_DIR%
+REM 如果使用虚拟环境则激活
+if /I "%USE_VENV%"=="true" (
+    if exist ".venv\Scripts\activate.bat" (
+        call .venv\Scripts\activate.bat
+        echo [start-ocr] 已激活虚拟环境: .venv
+    ) else (
+        echo [start-ocr] 错误：未找到虚拟环境 .venv
+        echo [start-ocr] 如需创建虚拟环境，请先手动创建：python -m venv .venv
+        pause
+        exit /b 1
+    )
 )
 
-REM 激活虚拟环境并安装依赖
-call %VENV_DIR%\Scripts\activate.bat
-python -m pip install --upgrade pip
-echo [start-ocr] 正在安装依赖...
-pip install -r requirements.txt
+echo [start-ocr] 使用 Python: %PYTHON_CMD%
+%PYTHON_CMD% --version
 
 REM 默认推理后端
 if not defined OCR_PROVIDERS (
@@ -111,9 +119,8 @@ if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
 echo [start-ocr] 正在后台启动 RapidOCR + OpenVINO 服务...
 echo [start-ocr] OCR_PROVIDERS=%OCR_PROVIDERS%
-start /B python main.py > "%LOG_DIR%\ocr.log" 2>&1
+start /B %PYTHON_CMD% main.py > "%LOG_DIR%\ocr.log" 2>&1
 
-REM Windows 下获取后台进程 PID 较麻烦，这里仅提示日志位置
 echo [start-ocr] 服务已后台启动
 echo [start-ocr] 健康检查地址: http://localhost:8000/health
 echo [start-ocr] API 地址: http://localhost:8000/ocr

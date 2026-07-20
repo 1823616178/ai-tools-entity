@@ -18,7 +18,7 @@ server_ocr/
 
 ## 本地开发（推荐）
 
-项目根目录已提供启动脚本，会自动创建虚拟环境、安装依赖并后台启动服务。
+项目根目录已提供启动脚本，默认使用**当前 Python 环境**后台启动服务。
 
 ### Linux / macOS
 
@@ -40,14 +40,18 @@ start-ocr.bat restart       # 重启
 start-ocr.bat stop          # 停止
 ```
 
-### 手动启动
+### 使用虚拟环境
+
+如果需要使用虚拟环境，先手动创建并安装依赖，然后启动时指定 `USE_VENV=true`：
 
 ```bash
 cd server_ocr
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
-python main.py
+
+# 回到项目根目录，使用虚拟环境启动
+USE_VENV=true ./start-ocr.sh start
 ```
 
 服务启动后访问：http://localhost:8000/docs

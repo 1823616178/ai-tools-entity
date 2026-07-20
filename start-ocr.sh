@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # 本地管理 RapidOCR + OpenVINO 服务（非 Docker，后台进程模式）
 # 用法：
-#   ./start-ocr.sh start    后台启动
-#   ./start-ocr.sh stop     停止
-#   ./start-ocr.sh status   查看状态
-#   ./start-ocr.sh restart  重启
+#   ./start-ocr.sh start        后台启动（使用当前 Python 环境）
+#   ./start-ocr.sh stop         停止
+#   ./start-ocr.sh status       查看状态
+#   ./start-ocr.sh restart      重启
+#   USE_VENV=true ./start-ocr.sh start   使用 server_ocr/.venv 虚拟环境
 
 set -e
 
@@ -12,9 +13,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/server_ocr"
 
 PYTHON_CMD="${PYTHON_CMD:-python3}"
-VENV_DIR="${VENV_DIR:-$SCRIPT_DIR/server_ocr/.venv}"
 PID_FILE="${PID_FILE:-$SCRIPT_DIR/server_ocr/.ocr.pid}"
 LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/server_ocr/logs}"
+USE_VENV="${USE_VENV:-false}"
 
 # 解析命令
 COMMAND="${1:-start}"
@@ -28,7 +29,10 @@ case "$COMMAND" in
         echo "  stop     停止服务"
         echo "  status   查看服务状态"
         echo "  restart  重启服务"
-        echo "  --help   显示帮助"
+        echo ""
+        echo "环境变量:"
+        echo "  USE_VENV=true     使用 server_ocr/.venv 虚拟环境"
+        echo "  PYTHON_CMD=python 指定 Python 命令"
         exit 1
         ;;
 esac
@@ -39,6 +43,10 @@ if [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "-h" ]; then
     echo "  stop     停止服务"
     echo "  status   查看服务状态"
     echo "  restart  重启服务"
+    echo ""
+    echo "环境变量:"
+    echo "  USE_VENV=true     使用 server_ocr/.venv 虚拟环境"
+    echo "  PYTHON_CMD=python 指定 Python 命令"
     exit 0
 fi
 
@@ -100,25 +108,22 @@ if ! command -v "$PYTHON_CMD" &> /dev/null; then
     fi
 fi
 
-# 创建虚拟环境
-if [ ! -d "$VENV_DIR" ]; then
-    echo "[start-ocr] 创建虚拟环境: $VENV_DIR"
-    "$PYTHON_CMD" -m venv "$VENV_DIR"
+# 如果使用虚拟环境则激活
+if [ "$USE_VENV" = "true" ]; then
+    VENV_DIR="$SCRIPT_DIR/server_ocr/.venv"
+    if [ -f "$VENV_DIR/bin/activate" ]; then
+        # shellcheck source=/dev/null
+        source "$VENV_DIR/bin/activate"
+        echo "[start-ocr] 已激活虚拟环境: $VENV_DIR"
+    else
+        echo "[start-ocr] 错误：未找到虚拟环境 $VENV_DIR"
+        echo "[start-ocr] 如需创建虚拟环境，请先手动创建：python -m venv $VENV_DIR"
+        exit 1
+    fi
 fi
 
-# 激活虚拟环境
-if [ -f "$VENV_DIR/bin/activate" ]; then
-    # shellcheck source=/dev/null
-    source "$VENV_DIR/bin/activate"
-else
-    echo "[start-ocr] 错误：无法找到虚拟环境激活脚本"
-    exit 1
-fi
-
-# 安装/更新依赖
-python -m pip install --upgrade pip
-echo "[start-ocr] 正在安装依赖..."
-pip install -r requirements.txt
+echo "[start-ocr] 使用 Python: $PYTHON_CMD"
+"$PYTHON_CMD" --version
 
 # 默认推理后端
 if [ -z "$OCR_PROVIDERS" ]; then
@@ -136,7 +141,7 @@ mkdir -p "$LOG_DIR"
 
 echo "[start-ocr] 正在后台启动 RapidOCR + OpenVINO 服务..."
 echo "[start-ocr] OCR_PROVIDERS=$OCR_PROVIDERS"
-nohup python main.py > "$LOG_DIR/ocr.log" 2>&1 &
+nohup "$PYTHON_CMD" main.py > "$LOG_DIR/ocr.log" 2>&1 &
 pid=$!
 echo "$pid" > "$PID_FILE"
 
