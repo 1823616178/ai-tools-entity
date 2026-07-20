@@ -40,6 +40,11 @@
                 <span class="feature-name">文件问题推荐</span>
                 <span class="feature-desc">按文件生成推荐问题</span>
             </NuxtLink>
+            <NuxtLink to="/document-question-answer" class="feature-card">
+                <span class="feature-icon">💬</span>
+                <span class="feature-name">文件问答</span>
+                <span class="feature-desc">图片/Word/PDF 自动 OCR 后问答</span>
+            </NuxtLink>
             <NuxtLink to="/summary-generation" class="feature-card">
                 <span class="feature-icon">📝</span>
                 <span class="feature-name">摘要生成</span>
