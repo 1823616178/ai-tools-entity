@@ -1,8 +1,9 @@
 # OpenVINO + RapidOCR 服务依赖
-# RapidOCR 基于 PaddleOCR 模型结构，支持 onnxruntime / openvino 后端
-# 注意：部分国内镜像源对 rapidocr 某些版本会返回 403，
-# 遇到这种情况可临时使用官方源安装：
-#   pip install -i https://pypi.org/simple -r requirements.txt
+# 部分国内镜像源对 rapidocr 某些版本会返回 403，
+# 此处增加官方 PyPI 作为兜底索引，pip 会优先使用用户当前配置的源，
+# 找不到或失败时回退到官方源。
+--extra-index-url https://pypi.org/simple/
+
 rapidocr
 onnxruntime-openvino>=1.18.0
 
