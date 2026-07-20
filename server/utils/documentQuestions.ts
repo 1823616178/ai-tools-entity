@@ -116,7 +116,7 @@ function isCjkCodePoint(code: number): boolean {
   )
 }
 
-function truncateToTokenBudget(text: string, tokenBudget: number): { text: string; truncated: boolean } {
+export function truncateToTokenBudget(text: string, tokenBudget: number): { text: string; truncated: boolean } {
   if (tokenBudget <= 0) {
     return { text: '', truncated: text.length > 0 }
   }

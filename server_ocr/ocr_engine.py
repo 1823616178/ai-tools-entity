@@ -12,6 +12,27 @@ from typing import List, Optional
 import cv2
 import numpy as np
 from config import Settings
+
+
+# Paddle 2.6.2 官方 wheel 在部分 AMD Zen+ 等 CPU 上会在 IR 优化阶段触发
+# `SelfAttentionFusePass` 的非法指令（SIGILL）崩溃。强制关闭 IR 优化可绕过该问题，
+# 对 PaddleOCR 推理模型影响很小。
+def _patch_paddle_disable_ir_optim() -> None:
+    try:
+        import paddle.inference as inference
+
+        _orig_switch_ir_optim = inference.Config.switch_ir_optim
+
+        def _switch_ir_optim(self, flag: bool) -> None:
+            _orig_switch_ir_optim(self, False)
+
+        inference.Config.switch_ir_optim = _switch_ir_optim
+    except Exception as exc:
+        logging.getLogger(__name__).warning(f"关闭 Paddle IR 优化补丁失败: {exc}")
+
+
+_patch_paddle_disable_ir_optim()
+
 from paddleocr import PaddleOCR
 from schemas import Box, OCRFileResult, OCRPageResult, OCRResult, Point, TextLine
 from utils import office_to_pdf, pdf_to_images

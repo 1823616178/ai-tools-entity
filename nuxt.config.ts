@@ -36,6 +36,9 @@ export default defineNuxtConfig({
     documentRecommendedQuestions: {
       questionCount: 3,
     },
+    documentQuestionAnswer: {
+      answerMaxLength: 800,
+    },
     logDir: './logs',
   },
 })
