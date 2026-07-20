@@ -1,0 +1,23 @@
+[Unit]
+Description=RapidOCR OpenVINO Service
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+Group=YOUR_USER
+WorkingDirectory=/path/to/aiTool/server_ocr
+Environment=OCR_PROVIDERS=OpenVINOExecutionProvider,CPUExecutionProvider
+Environment=OCR_HOST=0.0.0.0
+Environment=OCR_PORT=8000
+Environment=OCR_WORKERS=1
+Environment=OCR_MAX_CONCURRENT=4
+Environment=OCR_THREAD_WORKERS=4
+Environment=OCR_LOG_DIR=/path/to/aiTool/server_ocr/logs
+Environment=OCR_MODEL_DIR=/path/to/aiTool/server_ocr/models
+ExecStart=/path/to/aiTool/server_ocr/.venv/bin/python /path/to/aiTool/server_ocr/main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

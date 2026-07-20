@@ -1,10 +1,11 @@
 @echo off
 chcp 65001 >nul
-REM 本地启动 RapidOCR + OpenVINO 服务（非 Docker）
+REM 本地管理 RapidOCR + OpenVINO 服务（非 Docker，后台进程模式）
 REM 用法：
-REM   start-ocr.bat              前台运行
-REM   start-ocr.bat --daemon     后台运行（新窗口）
-REM   start-ocr.bat --stop       停止后台进程
+REM   start-ocr.bat start    后台启动
+REM   start-ocr.bat stop     停止
+REM   start-ocr.bat status   查看状态
+REM   start-ocr.bat restart  重启
 
 setlocal EnableDelayedExpansion
 
@@ -13,40 +14,31 @@ cd /d "%~dp0server_ocr"
 set PYTHON_CMD=python
 set VENV_DIR=.venv
 set PID_FILE=.ocr.pid
+set LOG_DIR=logs
 
-if /I "%~1"=="--help" (
-    echo 用法: %~nx0 [--daemon^|--stop^|--help]
-    echo   --daemon, -d   后台运行（新窗口）
-    echo   --stop, -s     停止后台进程
-    echo   --help, -h     显示帮助
-    exit /b 0
-)
+set COMMAND=%~1
+if "%COMMAND%"=="" set COMMAND=start
 
-if /I "%~1"=="-h" (
-    echo 用法: %~nx0 [--daemon^|--stop^|--help]
-    echo   --daemon, -d   后台运行（新窗口）
-    echo   --stop, -s     停止后台进程
-    echo   --help, -h     显示帮助
-    exit /b 0
-)
+if /I "%COMMAND%"=="--help" goto :show_help
+if /I "%COMMAND%"=="-h" goto :show_help
+if /I "%COMMAND%"=="start" goto :run_start
+if /I "%COMMAND%"=="stop" goto :run_stop
+if /I "%COMMAND%"=="status" goto :run_status
+if /I "%COMMAND%"=="restart" goto :run_restart
 
-REM 停止后台进程
-if /I "%~1"=="--stop" goto :stop_service
-if /I "%~1"=="-s" goto :stop_service
+echo [start-ocr] 未知参数: %COMMAND%
+goto :show_help
 
-REM 后台运行
-if /I "%~1"=="--daemon" goto :daemon_mode
-if /I "%~1"=="-d" goto :daemon_mode
+:show_help
+echo 用法: %~nx0 [start^|stop^|status^|restart^|--help]
+echo   start    后台启动服务
+echo   stop     停止服务
+echo   status   查看服务状态
+echo   restart  重启服务
+echo   --help   显示帮助
+exit /b 0
 
-REM 未知参数
-if not "%~1"=="" (
-    echo [start-ocr] 未知参数: %~1
-    exit /b 1
-)
-
-goto :run_foreground
-
-:stop_service
+:run_stop
 if exist "%PID_FILE%" (
     set /p PID=<"%PID_FILE%"
     echo [start-ocr] 正在停止 OCR 服务 (PID: !PID!)...
@@ -58,22 +50,25 @@ if exist "%PID_FILE%" (
 )
 exit /b 0
 
-:daemon_mode
+:run_status
 if exist "%PID_FILE%" (
     set /p PID=<"%PID_FILE%"
     tasklist /FI "PID eq !PID!" 2>nul | findstr /I "python" >nul
     if !errorlevel! == 0 (
-        echo [start-ocr] 错误：OCR 服务已在后台运行 (PID: !PID!)
-        exit /b 1
+        echo [start-ocr] OCR 服务正在后台运行 (PID: !PID!)
+    ) else (
+        echo [start-ocr] 后台进程已不存在
     )
+) else (
+    echo [start-ocr] 未找到后台进程
 )
-
-echo [start-ocr] 正在后台启动 RapidOCR + OpenVINO 服务...
-start "RapidOCR Service" cmd /c "cd /d "%CD%" && call .venv\Scripts\activate.bat && python main.py"
-REM 获取最后启动的窗口进程 PID 较复杂，这里仅提示用户手动关闭窗口或重启后使用 taskkill
 exit /b 0
 
-:run_foreground
+:run_restart
+call :run_stop
+goto :run_start
+
+:run_start
 %PYTHON_CMD% --version >nul 2>&1
 if errorlevel 1 (
     set PYTHON_CMD=py
@@ -84,9 +79,6 @@ if errorlevel 1 (
         exit /b 1
     )
 )
-
-echo [start-ocr] 使用 Python: %PYTHON_CMD%
-%PYTHON_CMD% --version
 
 REM 创建虚拟环境
 if not exist "%VENV_DIR%\Scripts\activate.bat" (
@@ -100,20 +92,32 @@ python -m pip install --upgrade pip
 echo [start-ocr] 正在安装依赖...
 pip install -r requirements.txt
 
-REM 提示当前推理后端
-if defined OCR_PROVIDERS (
-    echo [start-ocr] 检测到 OCR_PROVIDERS=%OCR_PROVIDERS%
-) else (
+REM 默认推理后端
+if not defined OCR_PROVIDERS (
     set OCR_PROVIDERS=OpenVINOExecutionProvider,CPUExecutionProvider
-    echo [start-ocr] 默认使用 OCR_PROVIDERS=%OCR_PROVIDERS%
 )
 
-echo [start-ocr] 正在前台启动 RapidOCR + OpenVINO 服务...
+REM 检查是否已在运行
+if exist "%PID_FILE%" (
+    set /p PID=<"%PID_FILE%"
+    tasklist /FI "PID eq !PID!" 2>nul | findstr /I "python" >nul
+    if !errorlevel! == 0 (
+        echo [start-ocr] 错误：OCR 服务已在后台运行 (PID: !PID!)
+        exit /b 1
+    )
+)
+
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
+echo [start-ocr] 正在后台启动 RapidOCR + OpenVINO 服务...
+echo [start-ocr] OCR_PROVIDERS=%OCR_PROVIDERS%
+start /B python main.py > "%LOG_DIR%\ocr.log" 2>&1
+
+REM Windows 下获取后台进程 PID 较麻烦，这里仅提示日志位置
+echo [start-ocr] 服务已后台启动
 echo [start-ocr] 健康检查地址: http://localhost:8000/health
 echo [start-ocr] API 地址: http://localhost:8000/ocr
-echo [start-ocr] 按 Ctrl+C 停止
-echo.
+echo [start-ocr] 日志文件: server_ocr/logs/ocr.log
+echo [start-ocr] 停止命令: %~nx0 stop
 
-python main.py
-
-pause
+exit /b 0

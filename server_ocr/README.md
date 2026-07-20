@@ -18,25 +18,26 @@ server_ocr/
 
 ## 本地开发（推荐）
 
-项目根目录已提供启动脚本，会自动创建虚拟环境、安装依赖并启动服务。
+项目根目录已提供启动脚本，会自动创建虚拟环境、安装依赖并后台启动服务。
 
 ### Linux / macOS
 
 ```bash
 cd aiTool
-./start-ocr.sh              # 前台运行
-./start-ocr.sh --daemon     # 后台运行
-./start-ocr.sh --stop       # 停止后台进程
-./start-ocr.sh --status     # 查看后台进程状态
+./start-ocr.sh start        # 后台启动
+./start-ocr.sh status       # 查看状态
+./start-ocr.sh restart      # 重启
+./start-ocr.sh stop         # 停止
 ```
 
 ### Windows
 
 ```cmd
 cd aiTool
-start-ocr.bat               # 前台运行
-start-ocr.bat --daemon      # 后台运行（新窗口）
-start-ocr.bat --stop        # 停止后台进程
+start-ocr.bat start         # 后台启动
+start-ocr.bat status        # 查看状态
+start-ocr.bat restart       # 重启
+start-ocr.bat stop          # 停止
 ```
 
 ### 手动启动
@@ -50,6 +51,47 @@ python main.py
 ```
 
 服务启动后访问：http://localhost:8000/docs
+
+## systemd 托管（生产环境推荐）
+
+Linux 生产环境建议通过 systemd 托管，支持开机自启和异常自动重启。
+
+### 自动安装
+
+项目根目录提供了一键安装脚本：
+
+```bash
+cd aiTool
+# 先创建虚拟环境并安装依赖
+./start-ocr.sh start
+./start-ocr.sh stop
+
+# 安装 systemd service
+sudo ./install-service.sh
+
+# 启动服务
+sudo systemctl start rapidocr
+
+# 查看状态
+sudo systemctl status rapidocr
+
+# 查看日志
+sudo journalctl -u rapidocr -f
+```
+
+### 手动安装
+
+也可以复制模板文件手动安装：
+
+```bash
+cp rapidocr.service.template /etc/systemd/system/rapidocr.service
+# 修改文件中的 YOUR_USER 和 /path/to/aiTool 为实际值
+sudo vim /etc/systemd/system/rapidocr.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable rapidocr
+sudo systemctl start rapidocr
+```
 
 ## Docker 运行（可选）
 
